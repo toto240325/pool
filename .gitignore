@@ -1,0 +1,15 @@
+params.py
+*.pyc
+*.old
+*.log*
+*.tmp
+*.jpg
+#.vscode
+workspace.code-workspace
+_pycache_
+venv
+params.ini
+obsolete
+tmp_unit_tests.txt
+*-audio-PCMA*
+*.h264
