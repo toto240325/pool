@@ -165,13 +165,17 @@ def get_best_result(candidate_results, img):
     #remove duplicates from list of valid results
     valid_results = list(dict.fromkeys(valid_results))
    
+    issues_path = "issues/"
+    if not os.path.isdir(issues_path):
+        os.mkdir(issues_path)
+    
     if len(valid_results) == 0:
         # no valid results; store image for later analysis
         pH = None
         Cl = None
         print("No valid results !")
         # store image for later analysis :
-        filename = "issues/noresult_" + now_str + ".jpg"
+        filename = issues_path + "noresult_" + now_str + ".jpg"
         cv2.imwrite(filename, img)
     else:
         # at least one valid result; first one is kept and returned
@@ -188,7 +192,7 @@ def get_best_result(candidate_results, img):
                     all_res = all_res + "_" + res[0:3] + res[-3:]
             print("more than 1 valid result : ", all_res)
             # store image for later analysis :
-            filename = "issues/ambiguous_" + all_res +"_" + now_str + ".jpg"
+            filename = issues_path + "ambiguous_" + all_res +"_" + now_str + ".jpg"
             cv2.imwrite(filename, img)
     
     return pH, Cl
@@ -286,6 +290,7 @@ def check_pool():
     basename = "base"
     get_cam_footage("tmp_"+basename)
     get_snapshot("tmp_"+basename)
+
     
     debug = False
     if debug:
@@ -354,5 +359,5 @@ def main():
 interactive = False
 
 if __name__ == '__main__':
-    interactive = True
+    interactive = False
     main()
