@@ -8,6 +8,10 @@
 # (for instance after having "eroded" the characters)
 # the last one (method 3 on eroded) seems to work the most often, but not always
 
+# cd /opt/db
+# sqlite3 mydatabase.db
+# select time,text from events where categ='pool_pH' and time<"2022-04-21";
+
 # Import packages
 from audioop import add
 import cv2
@@ -43,6 +47,7 @@ def get_cam_footage(basename):
     # $ vlc a.h264
     os.rename(f'{basename}-video-H264-1',f'{basename}.h264')
 
+
 def get_snapshot(basename):
     """
     extract a snapshot from <basename>.h264 and put it in <basename>.jpg
@@ -59,32 +64,33 @@ def get_snapshot(basename):
     # err = process.stderr
     # print("err = ", process.stderr)
 
+
 def cropped_digits_img(filename):
     global interactive
 
     # read the snapshot
     img = cv2.imread(filename)
-    # print(img.shape) # Print image shape
-    # if interactive: cv2.imshow("original", img)
+    #print(img.shape) # Print image shape
+    #if interactive: cv2.imshow("original", img)
 
     # convert to grey only
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # if interactive: cv2.imshow("greyed", img)
+    #if interactive: cv2.imshow("greyed", img)
 
     #invert image (black becomes white)
     img = (255-img)
-    # if interactive: cv2.imshow("greyed inverted", img)
+    #if interactive: cv2.imshow("greyed inverted", img)
 
     # Crop the image to focus onthe digits
     img = img[445:580, 620:1200]
-    # cv2.imshow("cropped", img2)
+    #if interactive: cv2.imshow("cropped", img)
 
     # thresholding
-    ret, img = cv2.threshold(img,10,255,cv2.THRESH_BINARY)
+    ret, img = cv2.threshold(img,30,255,cv2.THRESH_BINARY)
     # print("cv2.THRESH_BINARY : ", cv2.THRESH_BINARY)
 
     # Display cropped image
-    # if interactive: cv2.imshow("threshed", img)
+    #if interactive: cv2.imshow("threshed", img)
     return img
 
 
@@ -209,17 +215,9 @@ def optimise_img(img):
     #     [ 0, 0, 0, 0, 0 ]
     #     ],np.uint8)
 
-    # kernel = np.array( [    
-    #     [ 1, 1, 1, 1, 1 ],
-    #     [ 1, 1, 1, 1, 1 ],
-    #     [ 1, 1, 1, 1, 1 ],
-    #     [ 1, 1, 1, 1, 1 ],
-    #     [ 1, 1, 1, 1, 1 ]
-    #     ])
-
     img = cv2.erode(img,kernel,iterations = 2)
-    cv2.imwrite("erosion.jpg", img)
-    # if interactive: cv2.imshow("erosion", img)  
+    # cv2.imwrite("base_eroded.jpg", img)
+    # if interactive: cv2.imshow("eroded", img)  
     
     # invert the image again, since done at the beginning
     img = 255 - img
@@ -265,6 +263,14 @@ def explain_tesseract(img, title, options_str):
     # cv2.waitKey(0)
 
 
+def write_gray_to_file(img_name, img):
+    """
+    takes a gray image and write it to disk
+    """
+    img_to_save = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    cv2.imwrite(img_name + ".jpg", img_to_save)
+
+
 def check_pool():
     global candidate_results
     global interactive
@@ -277,9 +283,9 @@ def check_pool():
     # shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
     options_list = shlex.split(options_str)
 
-    basename = "chalet"
-    get_cam_footage(basename)
-    get_snapshot(basename)
+    basename = "base"
+    get_cam_footage("tmp_"+basename)
+    get_snapshot("tmp_"+basename)
     
     debug = False
     if debug:
@@ -287,21 +293,34 @@ def check_pool():
         img = cv2.imread(filename)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     else:
-        filename = basename+'.jpg'
+        filename = "tmp_"+basename+'.jpg'
         img = cropped_digits_img(filename)
 
-    #if interactive: cv2.imshow("cropped digits", img); cv2.waitKey
-    
+    img_name = basename+'_cropped'
+    #if interactive: cv2.imshow(img_name, img)
+    # save a copy of this plain image for later analysis
+    write_gray_to_file(img_name, img)
+
+    # # read it again to check
+    # img = cv2.imread(filename)
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # if interactive: cv2.imshow("cropped digits", img); cv2.waitKey
+
+    # extract the figures from this plain image
     res1 = get_digits(img, options_list)
     candidate_results.append(["tess. not optimised",res1])
     #if interactive: print("tesseract not optimised : ",res1)
     #if interactive: cv2.imshow("not optimised", img)
     explain_tesseract(img, "pytess. not optimised", options_str)
 
+    # try to optimise the image
     img = optimise_img(img)
-    #if interactive: cv2.imshow("optimized", img)
-    #print("")
+    img_name = basename+'_optimised'
+    #if interactive: cv2.imshow(img_name, img)
+    # save a copy of this plain image for later analysis
+    write_gray_to_file(img_name, img)
 
+    # extract the figures from this optimised image
     res2 = get_digits(img, options_list)
     candidate_results.append(["tess. optimised",res2])
     #if interactive: print("tesseract  optimised : ",res1)
