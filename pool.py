@@ -46,6 +46,7 @@ def get_cam_footage(basename):
     # $ cp chalet-video-H264-1 a.h264
     # $ vlc a.h264
     os.rename(f'{basename}-video-H264-1',f'{basename}.h264')
+    os.remove(f'{basename}-audio-PCMA-2')
 
 
 def get_snapshot(basename):
@@ -63,6 +64,7 @@ def get_snapshot(basename):
     # print("result = ", process.stdout)
     # err = process.stderr
     # print("err = ", process.stderr)
+    os.remove(f'{basename}.h264')
 
 
 def cropped_digits_img(filename):
@@ -94,10 +96,10 @@ def cropped_digits_img(filename):
     return img
 
 
-def get_digits(img, options_list):
+def get_digits(img_name, img, options_list):
     # reads digits from picture
     # if interactive: cv2.imshow("cropped digits", img)
-    temp_filename = "tmp_img.jpg"
+    temp_filename = img_name + ".jpg"
     temp_output_filename = "tmp_output.txt"
     cv2.imwrite(temp_filename, img)
 
@@ -287,7 +289,7 @@ def check_pool():
     # shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
     options_list = shlex.split(options_str)
 
-    basename = "base"
+    basename = "pool_base"
     get_cam_footage("tmp_"+basename)
     get_snapshot("tmp_"+basename)
 
@@ -300,6 +302,7 @@ def check_pool():
     else:
         filename = "tmp_"+basename+'.jpg'
         img = cropped_digits_img(filename)
+        os.remove(filename)
 
     img_name = basename+'_cropped'
     #if interactive: cv2.imshow(img_name, img)
@@ -312,7 +315,7 @@ def check_pool():
     # if interactive: cv2.imshow("cropped digits", img); cv2.waitKey
 
     # extract the figures from this plain image
-    res1 = get_digits(img, options_list)
+    res1 = get_digits(img_name, img, options_list)
     candidate_results.append(["tess. not optimised",res1])
     #if interactive: print("tesseract not optimised : ",res1)
     #if interactive: cv2.imshow("not optimised", img)
@@ -326,7 +329,7 @@ def check_pool():
     write_gray_to_file(img_name, img)
 
     # extract the figures from this optimised image
-    res2 = get_digits(img, options_list)
+    res2 = get_digits(img_name, img, options_list)
     candidate_results.append(["tess. optimised",res2])
     #if interactive: print("tesseract  optimised : ",res1)
     #if interactive: cv2.imshow("optimised", img)
