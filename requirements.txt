@@ -4,3 +4,4 @@ python-dateutil
 opencv-python
 pytesseract
 dateutils
+autopep8
