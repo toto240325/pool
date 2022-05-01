@@ -13,3 +13,4 @@ obsolete
 tmp_unit_tests.txt
 *-audio-PCMA*
 *.h264
+*.mp4
