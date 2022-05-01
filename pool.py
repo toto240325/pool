@@ -11,7 +11,7 @@
 # sqlite3 /opt/db/mydatabase.db
 # select time,text from events where categ='pool_pH' and time<"2022-04-21";
 # select time,text from events where categ='pool_pH' and time<"2022-04-21";
-# select text from events where categ="power_night" and text like '7%';
+# select text from events where categ="pool_night" and text like '7%';
 # select time, text from events where categ="pool_pH" and text > "7.9"; # and time = "2022-04-22 15:10:44";
 # select time, text from events where categ="pool_pH" and text < "4";
 # delete from events where categ="pool_pH" and text < "4";
@@ -237,15 +237,15 @@ def cropped_digits_img(filename):
 
     # convert to grey only
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    if interactive: cv2.imshow("full greyed", img); # cv2.waitKey(0);
+    # if interactive: cv2.imshow("full greyed", img); # cv2.waitKey(0);
 
     # invert image (black becomes white)
     img = (255-img)
-    if interactive: cv2.imshow("greyed inverted", img)
+    # if interactive: cv2.imshow("greyed inverted", img)
 
-    img_reinverted = np.copy(img)
-    img_reinverted = (255-img_reinverted)
-    if interactive: cv2.imshow("greyed re-inverted", img_reinverted)
+    # img_reinverted = np.copy(img)
+    # img_reinverted = (255-img_reinverted)
+    # if interactive: cv2.imshow("greyed re-inverted", img_reinverted)
 
 
 
@@ -466,7 +466,7 @@ def optimise_img(img):
     return img
 
 
-def explain_tesseract(img, title, options_str):
+def explain_tesseract(img, title, options_str,candidate_results):
     """
     explains the tesseract way of analysing this image by having boxes drawn around the characters
     """
@@ -520,6 +520,59 @@ def write_colour_to_file(img_name, img):
     img_to_save = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     cv2.imwrite(img_name + ".jpg", img_to_save)
 
+def collect_candidate_results(img, kind, basename):
+    """
+    extract from img, of given kind ("day", "night", etc) all the possible candidates as 
+    read string of numerical digits
+    """
+    # NB : shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
+    options_str = "--psm 13 -c tessedit_char_whitelist='.0123456789 '"
+    #options_str="--psm 6 -c tessedit_char_whitelist='.0123456789 '"
+    # shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
+    options_list = shlex.split(options_str)
+
+    candidate_results = []
+    img_name = basename+'_' + kind + '_cropped'
+    #if interactive: cv2.imshow(img_name, img)
+    # save a copy of this plain image for later analysis
+    write_gray_to_file(img_name, img)
+
+    # # read it again to check
+    # img = cv2.imread(filename)
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # if interactive: cv2.imshow("cropped digits", img); cv2.waitKey
+
+    # extract the figures from this plain image
+    res1 = get_digits(img_name, img, options_list)
+    candidate_results.append([kind + " tess. not optimised", res1])
+    # if interactive: print("tesseract not optimised : ",res1)
+    # if interactive: cv2.imshow("not optimised", img)
+    explain_tesseract(img, kind + " pytess. not optimised",
+                      options_str, candidate_results)
+
+    # try to optimise the image
+    img = optimise_img(img)
+    img_name = basename+'_' + kind + '_optimised'
+    #if interactive: cv2.imshow(img_name, img)
+    # save a copy of this plain image for later analysis
+    write_gray_to_file(img_name, img)
+
+    # extract the figures from this optimised image
+    res2 = get_digits(img_name, img, options_list)
+    candidate_results.append([kind + " tess. optimised", res2])
+    # if interactive: print("tesseract  optimised : ",res1)
+    # if interactive: cv2.imshow("optimised", img)
+    explain_tesseract(img, kind + " pytess. optimised",
+                      options_str, candidate_results)
+
+    return candidate_results
+
+
+def display_candidate_results(candidate_results):
+    for c in candidate_results:
+        if interactive:
+            print(f'{c[0]:35}: {c[1]}')
+
 
 def check_pool():
     global candidate_results
@@ -549,39 +602,48 @@ def check_pool():
         else:
             img = None
 
+
     if isinstance(img,np.ndarray) and img.any() != None:
 
-        img_name = basename+'_cropped_gray'
-        #if interactive: cv2.imshow(img_name, img)
-        # save a copy of this plain image for later analysis
-        write_gray_to_file(img_name, img)
 
-        # # read it again to check
-        # img = cv2.imread(filename)
-        # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        # if interactive: cv2.imshow("cropped digits", img); cv2.waitKey
+        # img_name = basename+'_cropped_gray'
+        # #if interactive: cv2.imshow(img_name, img)
+        # # save a copy of this plain image for later analysis
+        # write_gray_to_file(img_name, img)
 
-        # extract the figures from this plain image
-        res1 = get_digits(img_name, img, options_list)
-        candidate_results.append(["tess. not optimised", res1])
-        #if interactive: print("tesseract not optimised : ",res1)
-        #if interactive: cv2.imshow("not optimised", img)
-        explain_tesseract(img, "pytess. not optimised", options_str)
+        # # # read it again to check
+        # # img = cv2.imread(filename)
+        # # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # # if interactive: cv2.imshow("cropped digits", img); cv2.waitKey
 
-        # try to optimise the image
-        img = optimise_img(img)
-        img_name = basename+'_optimised'
-        #if interactive: cv2.imshow(img_name, img)
-        # save a copy of this plain image for later analysis
-        write_gray_to_file(img_name, img)
+        # # extract the figures from this plain image
+        # res1 = get_digits(img_name, img, options_list)
+        # candidate_results.append(["tess. not optimised", res1])
+        # #if interactive: print("tesseract not optimised : ",res1)
+        # #if interactive: cv2.imshow("not optimised", img)
+        # explain_tesseract(img, "pytess. not optimised", options_str)
 
-        # extract the figures from this optimised image
-        res2 = get_digits(img_name, img, options_list)
-        candidate_results.append(["tess. optimised", res2])
-        #if interactive: print("tesseract  optimised : ",res1)
-        #if interactive: cv2.imshow("optimised", img)
-        explain_tesseract(img, "pytess. optimised", options_str)
-        # print("")
+        # # try to optimise the image
+        # img = optimise_img(img)
+        # img_name = basename+'_optimised'
+        # #if interactive: cv2.imshow(img_name, img)
+        # # save a copy of this plain image for later analysis
+        # write_gray_to_file(img_name, img)
+
+        # # extract the figures from this optimised image
+        # res2 = get_digits(img_name, img, options_list)
+        # candidate_results.append(["tess. optimised", res2])
+        # #if interactive: print("tesseract  optimised : ",res1)
+        # #if interactive: cv2.imshow("optimised", img)
+        # explain_tesseract(img, "pytess. optimised", options_str)
+        # # print("")
+
+        candidate_results = collect_candidate_results(img, "power", basename)
+
+        # if interactive:
+        #     display_candidate_results(candidate_results)
+        # day = get_best_result(candidate_results, img_day, "day", None)
+
 
         pH, Cl = get_best_result(candidate_results, img)
         # pH,Cl = check_digits(res1)
@@ -602,7 +664,7 @@ def check_pool():
     return pH, Cl
 
 
-def calibration():
+def calibration_pool():
     global calib_x, calib_y, calib_width, calib_height
     basename = "pool_base"
 
@@ -641,7 +703,6 @@ def main():
         "------------------------------------------------------------")
     logging.info("Starting pool")
 
-
     nb_args = len(sys.argv)
     logging.info(f'Number of arguments: {nb_args} arguments.')
     logging.info(f'Argument List: {str(sys.argv)}')
@@ -649,7 +710,7 @@ def main():
         arg1 = sys.argv[1]
         logging.info(f"arg1 = {arg1}")
         if arg1 == "calib":
-            calibration()
+            calibration_pool()
         else:
             print_usage()
 
