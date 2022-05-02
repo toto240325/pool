@@ -44,7 +44,7 @@ calib_height = params.calib_height
 
 # export DISPLAY=localhost:xx.0
 
-os.environ["DISPLAY"] = "localhost:11.0"
+os.environ["DISPLAY"] = "localhost:10.0"
 logging.info(os.environ["DISPLAY"])
 
 
@@ -257,7 +257,7 @@ def cropped_digits_img(filename):
     write_gray_to_file(img_name, img)
 
 
-    if interactive: cv2.imshow("cropped_gray1", img); cv2.waitKey(0);
+    # if interactive: cv2.imshow("cropped_gray1", img); cv2.waitKey(0);
 
     # thresholding
     ret, img = cv2.threshold(img, 30, 255, cv2.THRESH_BINARY)
@@ -337,8 +337,8 @@ def get_best_result(candidate_results, img):
         st = st.replace(".", "")
         # there must be at least two numerical values separated by a space
         if st.find(" ") != -1 and (st[0:3].isnumeric() or st[-3:].isnumeric()):
-            print(f"st[0:3]: {st[0:3]} - st[0:3].isnumeric() : {st[0:3].isnumeric()}")
-            print(f"st[-3:]: {st[-3:]} - st[-3:].isnumeric() : {st[-3:].isnumeric()}")
+            # print(f"st[0:3]: {st[0:3]} - st[0:3].isnumeric() : {st[0:3].isnumeric()}")
+            # print(f"st[-3:]: {st[-3:]} - st[-3:].isnumeric() : {st[-3:].isnumeric()}")
             if st[0:3].isnumeric(): pH = int(st[0:3])/100.0
             if st[-3:].isnumeric(): Cl = int(st[-3:])
             # check the read figures make sense (sometimes a "7" is read as a "1" by tesseract)
@@ -715,15 +715,13 @@ def main():
             print_usage()
 
     pH, Cl = check_pool()
-    if pH != None:
+    if pH != None or Cl != None:
         logging.info(f'pH : {pH} - Cl : {Cl}')
     else:
         logging.info("Coudln't read the figures !")
 
     logging.info("Ending pool")
     utils.shutdown_logger()
-
-
 
 
 calibration_requested = False
