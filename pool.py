@@ -34,6 +34,8 @@ import shlex
 # from audioop import add
 
 from event import create_event
+from event import read_where
+
 import utils
 import params
 
@@ -305,6 +307,58 @@ def check_digits(st):
     return pH, Cl
 
 
+def last_validated_value(categ):
+    """
+    get from the DB the last value of category categ
+    """
+    now1 = datetime.datetime.now()
+    nowStr = now1.strftime('%Y-%m-%d %H:%M:%S')
+    res = read_where(categ, 1, "")
+    error = res["error"]
+    short_error_msg = ""
+    long_error_msg = ""
+    validated_value = None
+
+    if (error != ""):
+        short_error_msg = "events server unresponsive !!!"
+        long_error_msg(f"!!!! Error : could not read the last {categ} event - {error}")
+
+    # check that date is OK
+    if short_error_msg == "":
+        event = res["events"][0]
+        last_event_date = event["time"]
+        try:
+            last_event_Datetime = datetime.datetime.strptime(
+                last_event_date, '%Y-%m-%d %H:%M:%S')
+        except Exception as error:
+            short_error_msg = "event date is not a valid date !!!"
+            long_error_msg = f"date of last {categ} is not a date : {last_event_date} ! - {str(error)}"
+            # logging.error(long_error_msg)
+
+    # then check if the value we got is a valid float
+    if short_error_msg == "":
+        if event["text"].isnumeric:
+            validated_value = float(event["text"])
+        else:
+            validated_value = None
+            short_error_msg = "{categ} value is not a numeric value - {nowStr}"
+            long_error_msg = "{categ} value is not a numeric value"
+
+    if short_error_msg != "":
+        user_name = params.mailer
+        passwd = params.mailer_pw
+        from_email = params.from_email
+        to_email = params.to_email
+        subject = short_error_msg + "- " + nowStr
+        body = long_error_msg
+        htmlbody = None
+        myfilename = None
+        utils.mySend(user_name, passwd, from_email,
+                          to_email, subject, body, htmlbody, myfilename)
+
+    return validated_value
+
+
 def get_best_result(candidate_results, img):
     """
     results is an array of [label_str, result_str] (ex: ["tesseract optimised","743 423"])
@@ -349,8 +403,6 @@ def get_best_result(candidate_results, img):
             if Cl != None and Cl > 300:
                 valid_results_Cl.append(Cl)
 
-    # # remove duplicates from list of valid results
-    # valid_results = list(dict.fromkeys(valid_results))
 
     # remove duplicates from list of valid results for pH
     valid_results_pH = list(dict.fromkeys(valid_results_pH))
@@ -362,77 +414,62 @@ def get_best_result(candidate_results, img):
     if not os.path.isdir(issues_path):
         os.mkdir(issues_path)
 
-    # if len(valid_results) == 0:
-    #     # no valid results; store image for later analysis
-    #     pH = None
-    #     Cl = None
-    #     print("No valid results !")
-    #     # store image for later analysis :
-    #     filename = issues_path + "noresult_" + now_str + ".jpg"
-    #     cv2.imwrite(filename, img)
-    # else:
-    #     # at least one valid result; first one is kept and returned
-    #     st = valid_results[0]
-    #     pH = int(st[0:3])/100.0
-    #     Cl = int(st[-3:])
-    #     # if there were more than 1 valid result
-    #     if len(valid_results) > 1:
-    #         all_res = ""
-    #         for res in valid_results:
-    #             if all_res == "":
-    #                 all_res = res[0:3] + res[-3:]
-    #             else:
-    #                 all_res = all_res + "_" + res[0:3] + res[-3:]
-    #         print("more than 1 valid result : ", all_res)
-    #         # store image for later analysis :
-    #         filename = issues_path + "ambiguous_" + all_res + "_" + now_str + ".jpg"
-    #         cv2.imwrite(filename, img)
-
     if len(valid_results_pH) == 0:
         # no valid results; store image for later analysis
-        pH = None
+        best_candidate_pH = None
         print("No valid results for pH !")
         # store image for later analysis :
         filename = issues_path + "noresult_pH_" + now_str + ".jpg"
         cv2.imwrite(filename, img)
     else:
-        # at least one valid result for pH; first one is kept and returned
-        pH = valid_results_pH[0]
+        # at least one valid result; first one is kept, unless we find another one which is closer to the last_validated_val
+        last_validated_pH = last_validated_value("pool_pH")
+        last_validated_Cl = last_validated_value("pool_Cl")
+        best_candidate_pH = valid_results_pH[0]
+        # if there were more than 1 valid result
         if len(valid_results_pH) > 1:
-            all_res_pH = ""
-            for res in valid_results_pH:
-                if all_res_pH == "":
-                    all_res_pH = str(res)
+            prev_delta = abs(best_candidate_pH - last_validated_pH)
+            all_candidates_pH = ""
+            for candidate in valid_results_pH:
+                # find the delta between this candidate and the previously stored value in the DB
+                delta = abs(candidate - last_validated_pH)
+                if delta < prev_delta:
+                    best_candidate_pH = candidate
+                    prev_delta = delta
+                    
+                # accumulate in all_candidates a string with all the candidate values, for later analysis
+                if all_candidates_pH == "":
+                    all_candidates_pH = str(candidate)
                 else:
-                    all_res_pH = all_res_pH + "_" + str(res)
-            print("more than 1 valid result for Cl : ", all_res_pH)
+                    all_candidates_pH = all_candidates_pH + "_" + str(candidate)
+            logging.info(f'more than 1 valid result for Cl : {all_candidates_pH}')
             # store image for later analysis :
-            filename = issues_path + "ambiguous_pH_" + all_res_pH + "_" + now_str + ".jpg"
+            filename = issues_path + "ambiguous_pH_" + all_candidates_pH + "_" + now_str + ".jpg"
             cv2.imwrite(filename, img)
 
     if len(valid_results_Cl) == 0:
         # no valid results; store image for later analysis
-        Cl = None
+        best_candidate_Cl = None
         print("No valid results for Cl !")
         # store image for later analysis :
         filename = issues_path + "noresult_Cl_" + now_str + ".jpg"
         cv2.imwrite(filename, img)
     else:
         # at least one valid result for Cl; first one is kept and returned
-        Cl = valid_results_Cl[0]
+        best_candidate_Cl = valid_results_Cl[0]
         if len(valid_results_Cl) > 1:
-            all_res_Cl = ""
-            for res in valid_results_Cl:
-                if all_res_Cl == "":
-                    all_res_Cl = str(res)
+            all_candidates_Cl = ""
+            for candidate in valid_results_Cl:
+                if all_candidates_Cl == "":
+                    all_candidates_Cl = str(candidate)
                 else:
-                    all_res_Cl = all_res_Cl + "_" + str(res)
-            print("more than 1 valid result for Cl : ", all_res_Cl)
+                    all_candidates_Cl = all_candidates_Cl + "_" + str(candidate)
+            print("more than 1 valid result for best_candidate_Cl : ", all_candidates_Cl)
             # store image for later analysis :
-            filename = issues_path + "ambiguous_Cl_" + all_res_Cl + "_" + now_str + ".jpg"
+            filename = issues_path + "ambiguous_Cl_" + all_candidates_Cl + "_" + now_str + ".jpg"
             cv2.imwrite(filename, img)
 
-    return pH, Cl
+    return best_candidate_pH, best_candidate_Cl
 
 
 def optimise_img(img):
@@ -699,8 +736,7 @@ def print_usage():
 
 def main():
     utils.init_logger('INFO')
-    logging.info(
-        "------------------------------------------------------------")
+    logging.info("-----------------------------------------------------")
     logging.info("Starting pool")
 
     nb_args = len(sys.argv)
