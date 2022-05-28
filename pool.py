@@ -39,24 +39,31 @@ from event import read_where
 import utils
 import params
 
+webcam = params.webcam
 calib_x = params.calib_x
 calib_y = params.calib_y
 calib_width = params.calib_width
 calib_height = params.calib_height
 
+calib_status_ph_x = params.calib_status_ph_x
+calib_status_ph_y = params.calib_status_ph_y
+calib_status_ph_width = params.calib_status_ph_width
+calib_status_ph_height = params.calib_status_ph_height
+
+
 # export DISPLAY=localhost:xx.0
 
 os.environ["DISPLAY"] = "localhost:10.0"
-logging.info(os.environ["DISPLAY"])
+# print("DISPLAY : ",os.environ["DISPLAY"])
 
-
-def get_cam_footage(basename):
+def get_cam_footage(basename, webcam):
     """
     get 1 second of video from the chalet Webcam and put it in <basename>.h264
+    (this function should be identifical between pool and power)
     """
     process = subprocess.run(
         ['openRTSP', '-d', '1', '-V', '-F',
-            f'{basename}-', 'rtsp://admin:123456@192.168.0.4/'],
+            f'{basename}-', webcam],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True)
@@ -80,34 +87,17 @@ def get_cam_footage(basename):
     return footage_filename
 
 
-# def get_snapshot(basename):
-#     """
-#     extract a snapshot from <basename>.h264 and put it in <basename>.jpg
-#     """
-#     # extra a picture from that video
-#     process = subprocess.run(
-#         ['ffmpeg', '-y', '-i', f'{basename}.h264', '-frames:v', '1', f'{basename}.jpg'],
-#         stdout=subprocess.PIPE,
-#         stderr=subprocess.PIPE,
-#         universal_newlines=True)
-#     # print("args = ", process.args)
-#     # print("rc = ", process.returncode)
-#     # print("result = ", process.stdout)
-#     # err = process.stderr
-#     # print("err = ", process.stderr)
-#     os.remove(f'{basename}.h264')
-
-
-def get_snapshot(footage_filename):
+def get_snapshot_old(footage_filename):
     """
     extract a snapshot from <basename>.h264 and put it in <basename>.jpg
+    (this function should be identifical between pool and power)
     """
 
     if footage_filename == None:
         return None
     try_again = True
     i = 0
-    max_iteration = 10
+    max_iteration = 3
     basename_ext = os.path.basename(footage_filename)
     basename, ext = os.path.splitext(basename_ext)
     while try_again and i <= max_iteration:
@@ -149,18 +139,54 @@ def get_snapshot(footage_filename):
 
     return extracted_img_filename
 
+def get_snapshot(footage_filename):
+    """
+    extract a snapshot from <basename>.h264 and put it in <basename>.jpg
+    (this function should be identifical between pool and power)
+    """
 
-def set_calibration(img, x, y, width, height):
+    if footage_filename == None:
+        return None
+    basename_ext = os.path.basename(footage_filename)
+    basename, ext = os.path.splitext(basename_ext)
+    # extract a picture from that video
+    process = subprocess.run(
+        ['ffmpeg', '-y', '-i', f'{basename}.h264',
+            '-frames:v', '1', f'{basename}.jpg'],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True)
+    my_stdout = process.stdout
+    err = process.stderr
+    # print("----args = ", process.args)
+    # print("----rc = ", process.returncode)
+    # print("----stdout = ", my_stdout)
+    # print("----err = ", err)
+
+    if os.path.isfile(f'{basename}.jpg'):
+        os.rename(f'{basename}.h264', f'{basename}.bak.h264')
+        extracted_img_filename = f'{basename}.jpg'
+    else:
+        extracted_img_filename = None
+
+    return extracted_img_filename
+
+
+def set_calibration(title, img, x, y, width, height):
     """"
     allows to move a rectangle on top of a given image and returns the x,y coordinates of the top left corner 
     of the rectangle
+    (this function should be identifical between pool and power)
     """
     dist = 10  # distance (in pixels) to move the rectangle with each move
     mode = "P"   # P: arrows change position    S: arrows change size
-    window_name = "with rectangle"
-    flags = cv2.WINDOW_NORMAL
-    # flags = cv2.WINDOW_AUTOSIZE
+    window_name = title
+    flags = cv2.WINDOW_NORMAL & cv2.WINDOW_KEEPRATIO
+    #flags = cv2.WINDOW_AUTOSIZE
     cv2.namedWindow(window_name, flags)
+    cv2.resizeWindow(window_name, 1800, 1000)
+    cv2.moveWindow(window_name, 10,10)
+
     while True:
         img2 = np.copy(img)
         mytext = f'({x},{y}) width:{width} height:{height} - dist (+/-) : {dist} - Mode:{mode}'
@@ -215,20 +241,17 @@ def set_calibration(img, x, y, width, height):
             mode = "P" if mode == "V" else "V"
         else:
             print(k)  # else print its value
-
     cv2.destroyAllWindows()
-
     return x, y, width, height
 
 
-def cropped_digits_img(filename):
+def cropped_digits_pool_img(filename):
     global interactive
 
     basename_ext = os.path.basename(filename)
     basename, ext = os.path.splitext(basename_ext)
 
     # read the snapshot
-
     img = cv2.imread(filename)
     # logging.info(img.shape) # Print image shape
     # if interactive: cv2.imshow("original", img)
@@ -249,25 +272,63 @@ def cropped_digits_img(filename):
     # img_reinverted = (255-img_reinverted)
     # if interactive: cv2.imshow("greyed re-inverted", img_reinverted)
 
-
-
+    # ------------------------
+    # ph_cl
     # Crop the image to focus on the digits
-    # img = img[445:580, 620:1200]
-    img = img[calib_y : calib_y + calib_height, calib_x : calib_x + calib_width]
+    img_ph_cl = img[calib_y : calib_y + calib_height, calib_x : calib_x + calib_width]
 
     img_name = basename+'_cropped_gray1'
-    write_gray_to_file(img_name, img)
-
+    write_gray_to_file(img_name, img_ph_cl)
 
     # if interactive: cv2.imshow("cropped_gray1", img); cv2.waitKey(0);
 
-    # thresholding
-    ret, img = cv2.threshold(img, 30, 255, cv2.THRESH_BINARY)
+    # # # testing the best threshold
+    # img_bck = np.copy(img_day)
+    # for t in range(20, 40, 60, 80, 180, 20):
+    #     img_day = np.copy(img_bck)
+    #     _, img_day = cv2.threshold(img_day, t, 255, cv2.THRESH_BINARY)
+    #     if interactive: cv2.imshow(f"threshed {t}", img_day)
+    # img_bck = np.copy(img_day)
+    # cv2.waitKey(0)
+
+    best_threshold = 30
+
+    # thresholding to get a black/white picture
+    _, img_ph_cl = cv2.threshold(img_ph_cl, best_threshold, 255, cv2.THRESH_BINARY)
+
     # print("cv2.THRESH_BINARY : ", cv2.THRESH_BINARY)
+
+    # ------------------------
+    # status_ph
+    # Crop the image to focus on the digits
+    img_status_ph = img[calib_status_ph_y : calib_status_ph_y + calib_status_ph_height, calib_status_ph_x : calib_status_ph_x + calib_status_ph_width]
+
+    img_name = basename+'_cropped_gray1'
+    write_gray_to_file(img_name, img_status_ph)
+
+    # if interactive: cv2.imshow("cropped_gray1", img); cv2.waitKey(0);
+
+    # # # testing the best threshold
+    # img_bck = np.copy(img_status_ph)
+    # for t in range(20, 40, 60, 80, 180, 20):
+    #     img_status_ph = np.copy(img_bck)
+    #     _, img_status_ph = cv2.threshold(img_status_ph, t, 255, cv2.THRESH_BINARY)
+    #     if interactive: cv2.imshow(f"threshed {t}", img_status_ph)
+    # img_bck = np.copy(img_status_ph)
+    # cv2.waitKey(0)
+
+    best_threshold = 30
+
+    # thresholding to get a black/white picture
+    _, img_status_ph = cv2.threshold(img_status_ph, best_threshold, 255, cv2.THRESH_BINARY)
+
+    # print("cv2.THRESH_BINARY : ", cv2.THRESH_BINARY)
+
+    # -----------------------------------
 
     # Display cropped image
     #if interactive: cv2.imshow("threshed", img)
-    return img
+    return img_ph_cl, img_status_ph
 
 
 def get_digits(img_name, img, options_list):
@@ -383,7 +444,7 @@ def get_best_result(candidate_results, img):
     valid_results_Cl = []
     
     for c in candidate_results:
-        logging.info(print(f'{c[0]:35}: {c[1]}'))
+        logging.info(f'{c[0]:35}: {c[1]}')
         st = c[1].strip()
         # get rid of decimal dot (rare, but sometimes they are recognised by OCR)
         pH = None
@@ -615,8 +676,6 @@ def check_pool():
     global candidate_results
     global interactive
 
-    candidate_results = []
-
     # NB : shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
     options_str = "--psm 13 -c tessedit_char_whitelist='.0123456789 '"
     #options_str="--psm 6 -c tessedit_char_whitelist='.0123456789 '"
@@ -625,63 +684,54 @@ def check_pool():
 
     basename = "pool_base"
 
-    if debug:
-        filename = "threshed_chalet1.jpg"
-        img = cv2.imread(filename)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    else:
-        footage_filename = get_cam_footage(basename)
-        img_filename = get_snapshot(footage_filename)
-        if img_filename != None and os.path.isfile(img_filename):
-            img = cropped_digits_img(img_filename)
-            img_filename_bak = "tmp_"+basename+'.bak.jpg'
-            os.rename(img_filename, img_filename_bak)
+    # if debug:
+    #     filename = "threshed_chalet1.jpg"
+    #     img = cv2.imread(filename)
+    #     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # else:
+    #     footage_filename = get_cam_footage(basename, webcam)
+    #     img_filename = get_snapshot(footage_filename)
+    #     if img_filename != None and os.path.isfile(img_filename):
+    #         img = cropped_digits_pool_img(img_filename)
+    #         img_filename_bak = "tmp_"+basename+'.bak.jpg'
+    #         os.rename(img_filename, img_filename_bak)
+    #     else:
+    #         img = None
+
+
+    successful = False
+    i = 1
+    max_iteration = 10
+    while not successful and i <= max_iteration:
+        footage_filename = get_cam_footage("tmp_"+basename, webcam)
+        if footage_filename != None:
+            successful = get_snapshot("tmp_"+basename)
         else:
-            img = None
+            logging.error(f'iter {i} : failed to get footage')
+        if not successful:
+            logging.error(f'iter {i} : failed to get snapshot out of footage')
+        i += 1
+
+    if successful:
+        debug = False
+        if debug:
+            filename = "threshed_chalet1.jpg"
+            img = cv2.imread(filename)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        else:
+            filename = "tmp_"+basename+'.jpg'
+            filename_bak = "tmp_"+basename+'.bak.jpg'
+            img_ph_cl, img_status_ph = cropped_digits_pool_img(filename)
+            os.rename(filename, filename_bak)
+
+        if interactive:
+            print("")
 
 
+    img = img_ph_cl
     if isinstance(img,np.ndarray) and img.any() != None:
-
-
-        # img_name = basename+'_cropped_gray'
-        # #if interactive: cv2.imshow(img_name, img)
-        # # save a copy of this plain image for later analysis
-        # write_gray_to_file(img_name, img)
-
-        # # # read it again to check
-        # # img = cv2.imread(filename)
-        # # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        # # if interactive: cv2.imshow("cropped digits", img); cv2.waitKey
-
-        # # extract the figures from this plain image
-        # res1 = get_digits(img_name, img, options_list)
-        # candidate_results.append(["tess. not optimised", res1])
-        # #if interactive: print("tesseract not optimised : ",res1)
-        # #if interactive: cv2.imshow("not optimised", img)
-        # explain_tesseract(img, "pytess. not optimised", options_str)
-
-        # # try to optimise the image
-        # img = optimise_img(img)
-        # img_name = basename+'_optimised'
-        # #if interactive: cv2.imshow(img_name, img)
-        # # save a copy of this plain image for later analysis
-        # write_gray_to_file(img_name, img)
-
-        # # extract the figures from this optimised image
-        # res2 = get_digits(img_name, img, options_list)
-        # candidate_results.append(["tess. optimised", res2])
-        # #if interactive: print("tesseract  optimised : ",res1)
-        # #if interactive: cv2.imshow("optimised", img)
-        # explain_tesseract(img, "pytess. optimised", options_str)
-        # # print("")
-
         candidate_results = collect_candidate_results(img, "power", basename)
-
-        # if interactive:
-        #     display_candidate_results(candidate_results)
-        # day = get_best_result(candidate_results, img_day, "day", None)
-
-
+        
         pH, Cl = get_best_result(candidate_results, img)
         # pH,Cl = check_digits(res1)
 
@@ -703,9 +753,10 @@ def check_pool():
 
 def calibration_pool():
     global calib_x, calib_y, calib_width, calib_height
+    global calib_status_ph_x, calib_status_ph_y, calib_status_ph_width, calib_status_ph_height
     basename = "pool_base"
 
-    footage_filename = get_cam_footage(basename)
+    footage_filename = get_cam_footage(basename, webcam)
     img_filename = get_snapshot(footage_filename)
     img = None
     if img_filename != None and os.path.isfile(img_filename):
@@ -713,15 +764,27 @@ def calibration_pool():
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     if isinstance(img,np.ndarray):
+        title = "ph-cl"        
         calib_x, calib_y, calib_width, calib_height = set_calibration(
-            img, calib_x, calib_y, calib_width, calib_height)
+            title, img, calib_x, calib_y, calib_width, calib_height)
         utils.replace_param("params.py", "calib_x", calib_x)
         utils.replace_param("params.py", "calib_y", calib_y)
         utils.replace_param("params.py", "calib_width", calib_width)
         utils.replace_param("params.py", "calib_height", calib_height)
-
         logging.info(
             f'x:{calib_x}, y:{calib_y}, width:{calib_width}, height:{calib_height}')
+
+        title = "status_ph"        
+        calib_status_ph_x, calib_status_ph_y, calib_status_ph_width, calib_status_ph_height = set_calibration(
+            title, img, calib_status_ph_x, calib_status_ph_y, calib_status_ph_width, calib_status_ph_height)
+        utils.replace_param("params.py", "calib_status_ph_x", calib_status_ph_x)
+        utils.replace_param("params.py", "calib_status_ph_y", calib_status_ph_y)
+        utils.replace_param("params.py", "calib_status_ph_width", calib_status_ph_width)
+        utils.replace_param("params.py", "calib_status_ph_height", calib_status_ph_height)
+        logging.info(
+            f'x:{calib_status_ph_x}, y:{calib_status_ph_y}, width:{calib_status_ph_width}, height:{calib_status_ph_height}')
+
+
     else:
         logging.error("Cannot calibrate because didn't get an image")
     
@@ -764,6 +827,8 @@ calibration_requested = False
 interactive = False
 
 if __name__ == '__main__':
-    interactive = True
+    import getpass
+    username = getpass.getuser()
+    interactive = (username == "toto")
     debug = False
     main()

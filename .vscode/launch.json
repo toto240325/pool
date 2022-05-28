@@ -10,6 +10,9 @@
             "request": "launch",
             "program": "${file}",
             //"args": [ "calib" ],
+            // # sshagent
+            // # scp params.py sd3:/tmp/params_pool.py; ssh -t sd3 "sudo cp /tmp/params_pool.py /opt/pool/params.py"
+
             "console": "integratedTerminal",
             "justMyCode": true
         }
