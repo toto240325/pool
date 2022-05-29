@@ -50,6 +50,7 @@ calib_status_ph_y = params.calib_status_ph_y
 calib_status_ph_width = params.calib_status_ph_width
 calib_status_ph_height = params.calib_status_ph_height
 
+best_threshold = params.best_threshold
 
 # export DISPLAY=localhost:xx.0
 
@@ -283,15 +284,15 @@ def cropped_digits_pool_img(filename):
     # if interactive: cv2.imshow("cropped_gray1", img); cv2.waitKey(0);
 
     # # # testing the best threshold
-    # img_bck = np.copy(img_day)
-    # for t in range(20, 40, 60, 80, 180, 20):
-    #     img_day = np.copy(img_bck)
-    #     _, img_day = cv2.threshold(img_day, t, 255, cv2.THRESH_BINARY)
-    #     if interactive: cv2.imshow(f"threshed {t}", img_day)
-    # img_bck = np.copy(img_day)
-    # cv2.waitKey(0)
+    img_bck = np.copy(img_ph_cl)
+    for t in range(10, 31, 5):
+        img_ph_cl = np.copy(img_bck)
+        _, img_ph_cl = cv2.threshold(img_ph_cl, t, 255, cv2.THRESH_BINARY)
+        if interactive: cv2.imshow(f"threshed {t}", img_ph_cl)
+    img_bck = np.copy(img_ph_cl)
+    cv2.waitKey(0)
 
-    best_threshold = 30
+    best_threshold = params.best_threshold
 
     # thresholding to get a black/white picture
     _, img_ph_cl = cv2.threshold(img_ph_cl, best_threshold, 255, cv2.THRESH_BINARY)
