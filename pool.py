@@ -311,7 +311,9 @@ def get_best_thresholded_img(img, basename, kind, best, step):
     # if kind == "status_cl": mmsb = [90, 111, 10, 100]
     # if kind == "status_p":  mmsb = [90, 111, 10, 100]
     
-    test_best_threshold(cropped_img, start, end, step)
+    if False:
+        test_best_threshold(cropped_img, start, end, step)
+    
     best_threshold = best
 
     # thresholding to get a black/white picture
@@ -408,11 +410,10 @@ def cropped_digits_pool_img(filename):
 
     # # print("cv2.THRESH_BINARY : ", cv2.THRESH_BINARY)
 
-    if False:
-        img_ph_cl = get_best_thresholded_img    (img, basename, "ph_cl",     60, 10)
-        img_status_ph = get_best_thresholded_img(img, basename, "status_ph", 80, 10)
-        img_status_cl = get_best_thresholded_img(img, basename, "status_cl", 80, 10)
-        img_status_p = get_best_thresholded_img (img, basename, "status_p",  90, 10)
+    img_ph_cl = get_best_thresholded_img    (img, basename, "ph_cl",     60, 10)
+    img_status_ph = get_best_thresholded_img(img, basename, "status_ph", 80, 10)
+    img_status_cl = get_best_thresholded_img(img, basename, "status_cl", 80, 10)
+    img_status_p = get_best_thresholded_img (img, basename, "status_p",  90, 10)
     
     # -----------------------------------
 
