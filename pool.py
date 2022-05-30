@@ -50,6 +50,16 @@ calib_status_ph_y = params.calib_status_ph_y
 calib_status_ph_width = params.calib_status_ph_width
 calib_status_ph_height = params.calib_status_ph_height
 
+calib_status_cl_x = params.calib_status_cl_x
+calib_status_cl_y = params.calib_status_cl_y
+calib_status_cl_width = params.calib_status_cl_width
+calib_status_cl_height = params.calib_status_cl_height
+
+calib_status_p_x = params.calib_status_p_x
+calib_status_p_y = params.calib_status_p_y
+calib_status_p_width = params.calib_status_p_width
+calib_status_p_height = params.calib_status_p_height
+
 best_threshold = params.best_threshold
 
 # export DISPLAY=localhost:xx.0
@@ -246,8 +256,73 @@ def set_calibration(title, img, x, y, width, height):
     return x, y, width, height
 
 
+def test_best_threshold(img, start, end, step):
+    # # # # testing the best threshold
+    img_bck = np.copy(img)
+    i = 0
+    height = 200
+    width = 500
+    for t in range(start, end, step):
+        img = np.copy(img_bck)
+        _, img = cv2.threshold(img, t, 255, cv2.THRESH_BINARY)
+        if interactive: 
+            window_name = f"thresholded {t}"
+            flags = cv2.WINDOW_NORMAL & cv2.WINDOW_KEEPRATIO
+            #flags = cv2.WINDOW_AUTOSIZE
+            cv2.namedWindow(window_name, flags)
+            cv2.resizeWindow(window_name, width, height)
+            cv2.moveWindow(window_name, 10, 10 + i*(height+10))
+
+            cv2.imshow(window_name, img)
+            
+        i += 1
+    img_bck = np.copy(img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+def get_best_thresholded_img(img, basename, kind, best, step):
+    # Crop the image to focus on the interesting part
+    # best : best value so far
+    # step : step between 2 values of candidate best_threshold value
+    
+    start = best - 2*step
+    end = best + 2*step + 1
+        
+    if kind == "ph_cl":
+        cropped_img = np.copy(img[calib_y : calib_y + calib_height, calib_x : calib_x + calib_width])
+    elif kind == "status_ph":
+        cropped_img = np.copy(img[calib_status_ph_y : calib_status_ph_y + calib_status_ph_height, calib_status_ph_x : calib_status_ph_x + calib_status_ph_width])
+    elif kind == "status_cl":
+        cropped_img = np.copy(img[calib_status_cl_y : calib_status_cl_y + calib_status_cl_height, calib_status_cl_x : calib_status_cl_x + calib_status_cl_width])
+    elif kind == "status_p":
+        cropped_img = np.copy(img[calib_status_p_y : calib_status_p_y + calib_status_p_height, calib_status_p_x : calib_status_p_x + calib_status_p_width])
+    else:
+        logging.error(f'unexpected kind : {kind} !!')
+        
+    # save a copy of the cropped img for later analysis
+    img_name = basename + '_' + kind + '_cropped_gray1'
+    write_gray_to_file(img_name, cropped_img)
+
+    # if interactive: cv2.imshow("cropped_gray1", cropped_img); cv2.waitKey(0);
+
+    # # mmsb : min_max_step_best
+    # if kind == "ph_cl":     mmsb = [90, 111, 10, 60]    # best_threshold at 12:00
+    # if kind == "status_ph": mmsb = [90, 111, 10, 100]
+    # if kind == "status_cl": mmsb = [90, 111, 10, 100]
+    # if kind == "status_p":  mmsb = [90, 111, 10, 100]
+    
+    test_best_threshold(cropped_img, start, end, step)
+    best_threshold = best
+
+    # thresholding to get a black/white picture
+    _, cropped_img = cv2.threshold(cropped_img, best_threshold, 255, cv2.THRESH_BINARY)
+
+    # print("cv2.THRESH_BINARY : ", cv2.THRESH_BINARY)
+    return cropped_img
+
+
 def cropped_digits_pool_img(filename):
-    global interactive
+    global interactive, best_threshold
 
     basename_ext = os.path.basename(filename)
     basename, ext = os.path.splitext(basename_ext)
@@ -273,66 +348,80 @@ def cropped_digits_pool_img(filename):
     # img_reinverted = (255-img_reinverted)
     # if interactive: cv2.imshow("greyed re-inverted", img_reinverted)
 
-    # ------------------------
-    # ph_cl
-    # Crop the image to focus on the digits
-    img_ph_cl = img[calib_y : calib_y + calib_height, calib_x : calib_x + calib_width]
+    # # ------------------------
+    # # ph_cl
+    # # Crop the image to focus on the digits
+    # img_ph_cl = img[calib_y : calib_y + calib_height, calib_x : calib_x + calib_width]
 
-    img_name = basename+'_cropped_gray1'
-    write_gray_to_file(img_name, img_ph_cl)
+    # img_name = basename+'_cropped_gray1'
+    # write_gray_to_file(img_name, img_ph_cl)
 
-    # if interactive: cv2.imshow("cropped_gray1", img); cv2.waitKey(0);
+    # # if interactive: cv2.imshow("cropped_gray1", img); cv2.waitKey(0);
 
-    # # # testing the best threshold
-    img_bck = np.copy(img_ph_cl)
-    for t in range(10, 31, 5):
-        img_ph_cl = np.copy(img_bck)
-        _, img_ph_cl = cv2.threshold(img_ph_cl, t, 255, cv2.THRESH_BINARY)
-        if interactive: cv2.imshow(f"threshed {t}", img_ph_cl)
-    img_bck = np.copy(img_ph_cl)
-    cv2.waitKey(0)
+    # test_best_threshold(img_status_cl, 40, 81, 20)
 
-    best_threshold = params.best_threshold
+    # # best_threshold comes from params.py
+    # best_threshold = 60 # at 12:00
 
-    # thresholding to get a black/white picture
-    _, img_ph_cl = cv2.threshold(img_ph_cl, best_threshold, 255, cv2.THRESH_BINARY)
+    # # thresholding to get a black/white picture
+    # _, img_ph_cl = cv2.threshold(img_ph_cl, best_threshold, 255, cv2.THRESH_BINARY)
 
-    # print("cv2.THRESH_BINARY : ", cv2.THRESH_BINARY)
+    # # print("cv2.THRESH_BINARY : ", cv2.THRESH_BINARY)
 
-    # ------------------------
-    # status_ph
-    # Crop the image to focus on the digits
-    img_status_ph = img[calib_status_ph_y : calib_status_ph_y + calib_status_ph_height, calib_status_ph_x : calib_status_ph_x + calib_status_ph_width]
+    # # ------------------------
+    # # status_ph
+    # # Crop the image to focus on the digits
+    # img_status_ph = img[calib_status_ph_y : calib_status_ph_y + calib_status_ph_height, calib_status_ph_x : calib_status_ph_x + calib_status_ph_width]
 
-    img_name = basename+'_cropped_gray1'
-    write_gray_to_file(img_name, img_status_ph)
+    # img_name = basename+'_cropped_gray1'
+    # write_gray_to_file(img_name, img_status_ph)
 
-    # if interactive: cv2.imshow("cropped_gray1", img); cv2.waitKey(0);
+    # # if interactive: cv2.imshow("cropped_gray1", img); cv2.waitKey(0);
 
-    # # # testing the best threshold
-    # img_bck = np.copy(img_status_ph)
-    # for t in range(20, 40, 60, 80, 180, 20):
-    #     img_status_ph = np.copy(img_bck)
-    #     _, img_status_ph = cv2.threshold(img_status_ph, t, 255, cv2.THRESH_BINARY)
-    #     if interactive: cv2.imshow(f"threshed {t}", img_status_ph)
-    # img_bck = np.copy(img_status_ph)
-    # cv2.waitKey(0)
+    # test_best_threshold(img_status_ph, 90,111,10)
+    
+    # # best_threshold comes from params.py
+    # best_threshold = 100 # at 12:00
 
-    best_threshold = 30
+    # # thresholding to get a black/white picture
+    # _, img_status_ph = cv2.threshold(img_status_ph, best_threshold, 255, cv2.THRESH_BINARY)
 
-    # thresholding to get a black/white picture
-    _, img_status_ph = cv2.threshold(img_status_ph, best_threshold, 255, cv2.THRESH_BINARY)
+    # # print("cv2.THRESH_BINARY : ", cv2.THRESH_BINARY)
 
-    # print("cv2.THRESH_BINARY : ", cv2.THRESH_BINARY)
+    # # ------------------------
+    # # status_cl
+    # # Crop the image to focus on the digits
+    # img_status_cl = img[calib_status_cl_y : calib_status_cl_y + calib_status_cl_height, calib_status_cl_x : calib_status_cl_x + calib_status_cl_width]
 
+    # img_name = basename+'_cropped_gray1'
+    # write_gray_to_file(img_name, img_status_cl)
+
+    # # if interactive: cv2.imshow("cropped_gray1", img); cv2.waitKey(0);
+
+    # test_best_threshold(img_status_ph, 90,111,10)
+
+    # # best_threshold comes from params.py
+    # best_threshold = 90 # at 12:00
+
+    # # thresholding to get a black/white picture
+    # _, img_status_cl = cv2.threshold(img_status_cl, best_threshold, 255, cv2.THRESH_BINARY)
+
+    # # print("cv2.THRESH_BINARY : ", cv2.THRESH_BINARY)
+
+    if False:
+        img_ph_cl = get_best_thresholded_img    (img, basename, "ph_cl",     60, 10)
+        img_status_ph = get_best_thresholded_img(img, basename, "status_ph", 80, 10)
+        img_status_cl = get_best_thresholded_img(img, basename, "status_cl", 80, 10)
+        img_status_p = get_best_thresholded_img (img, basename, "status_p",  90, 10)
+    
     # -----------------------------------
 
     # Display cropped image
     #if interactive: cv2.imshow("threshed", img)
-    return img_ph_cl, img_status_ph
+    return img_ph_cl, img_status_ph, img_status_cl, img_status_p
 
 
-def get_digits(img_name, img, options_list):
+def get_OCR_string(img_name, img, options_list):
     # reads digits from picture
     # if interactive: cv2.imshow("cropped digits", img)
     temp_filename = img_name + ".jpg"
@@ -531,7 +620,122 @@ def get_best_result(candidate_results, img):
             filename = issues_path + "ambiguous_Cl_" + all_candidates_Cl + "_" + now_str + ".jpg"
             cv2.imwrite(filename, img)
 
+    logging.info("")
     return best_candidate_pH, best_candidate_Cl
+
+
+def get_best_result_status(candidate_results, img):
+    """
+    result is the non-tuple (pH, Cl)
+    algorithm :
+    (label_str, result_str) 
+    - create a list with only the valid results (format must be "999 999", after having removed any dot ("."))
+        (ex: (["tesseract optimised","743 423"])
+    - if there are no result
+        store the problematic image for later analysis in issues/noresult-<datetime>
+        return None,None
+    - if there are several valid results :
+        - if all of them are the same :
+            return pH,Cl
+        - if there are different results :
+            store the problematic image for later analysis in issues/ambiguous-<datetime>
+            return first pH,Cl in the list
+    """
+
+    x = datetime.datetime.now()
+    now_str = x.strftime("%Y-%m-%d_%H-%M-%S")
+
+    # create a list of valid results only
+    valid_results = []
+    best_result = ""
+    
+    for c in candidate_results:
+        logging.info(f'{c[0]:35}: {c[1]}')
+        # st = c[1].strip()
+        # result = None
+        # st = st.replace(".", "")
+        # # there must be at least two numerical values separated by a space
+        # if st.find(" ") != -1 and (st[0:3].isnumeric() or st[-3:].isnumeric()):
+        #     # print(f"st[0:3]: {st[0:3]} - st[0:3].isnumeric() : {st[0:3].isnumeric()}")
+        #     # print(f"st[-3:]: {st[-3:]} - st[-3:].isnumeric() : {st[-3:].isnumeric()}")
+        #     if st[0:3].isnumeric(): pH = int(st[0:3])/100.0
+        #     if st[-3:].isnumeric(): Cl = int(st[-3:])
+        #     # check the read figures make sense (sometimes a "7" is read as a "1" by tesseract)
+        #     # if pH > 3 and Cl > 300:
+        #     #     valid_results.append(st)
+        #     if pH != None and pH > 3 :
+        #         valid_results_pH.append(pH)
+        #     if Cl != None and Cl > 300:
+        #         valid_results_Cl.append(Cl)
+
+
+    # # remove duplicates from list of valid results for pH
+    # valid_results_pH = list(dict.fromkeys(valid_results_pH))
+
+    # # remove duplicates from list of valid results for Cl
+    # valid_results_Cl = list(dict.fromkeys(valid_results_Cl))
+
+    # issues_path = "issues/"
+    # if not os.path.isdir(issues_path):
+    #     os.mkdir(issues_path)
+
+    # if len(valid_results_pH) == 0:
+    #     # no valid results; store image for later analysis
+    #     best_candidate_pH = None
+    #     print("No valid results for pH !")
+    #     # store image for later analysis :
+    #     filename = issues_path + "noresult_pH_" + now_str + ".jpg"
+    #     cv2.imwrite(filename, img)
+    # else:
+    #     # at least one valid result; first one is kept, unless we find another one which is closer to the last_validated_val
+    #     last_validated_pH = last_validated_value("pool_pH")
+    #     last_validated_Cl = last_validated_value("pool_Cl")
+    #     best_candidate_pH = valid_results_pH[0]
+    #     # if there were more than 1 valid result
+    #     if len(valid_results_pH) > 1:
+    #         prev_delta = abs(best_candidate_pH - last_validated_pH)
+    #         all_candidates_pH = ""
+    #         for candidate in valid_results_pH:
+    #             # find the delta between this candidate and the previously stored value in the DB
+    #             delta = abs(candidate - last_validated_pH)
+    #             if delta < prev_delta:
+    #                 best_candidate_pH = candidate
+    #                 prev_delta = delta
+                    
+    #             # accumulate in all_candidates a string with all the candidate values, for later analysis
+    #             if all_candidates_pH == "":
+    #                 all_candidates_pH = str(candidate)
+    #             else:
+    #                 all_candidates_pH = all_candidates_pH + "_" + str(candidate)
+    #         logging.info(f'more than 1 valid result for Cl : {all_candidates_pH}')
+    #         # store image for later analysis :
+    #         filename = issues_path + "ambiguous_pH_" + all_candidates_pH + "_" + now_str + ".jpg"
+    #         cv2.imwrite(filename, img)
+
+    # if len(valid_results_Cl) == 0:
+    #     # no valid results; store image for later analysis
+    #     best_candidate_Cl = None
+    #     print("No valid results for Cl !")
+    #     # store image for later analysis :
+    #     filename = issues_path + "noresult_Cl_" + now_str + ".jpg"
+    #     cv2.imwrite(filename, img)
+    # else:
+    #     # at least one valid result for Cl; first one is kept and returned
+    #     best_candidate_Cl = valid_results_Cl[0]
+    #     if len(valid_results_Cl) > 1:
+    #         all_candidates_Cl = ""
+    #         for candidate in valid_results_Cl:
+    #             if all_candidates_Cl == "":
+    #                 all_candidates_Cl = str(candidate)
+    #             else:
+    #                 all_candidates_Cl = all_candidates_Cl + "_" + str(candidate)
+    #         print("more than 1 valid result for best_candidate_Cl : ", all_candidates_Cl)
+    #         # store image for later analysis :
+    #         filename = issues_path + "ambiguous_Cl_" + all_candidates_Cl + "_" + now_str + ".jpg"
+    #         cv2.imwrite(filename, img)
+
+    logging.info("")
+    return best_result
 
 
 def optimise_img(img):
@@ -642,7 +846,7 @@ def collect_candidate_results(img, kind, basename):
     # if interactive: cv2.imshow("cropped digits", img); cv2.waitKey
 
     # extract the figures from this plain image
-    res1 = get_digits(img_name, img, options_list)
+    res1 = get_OCR_string(img_name, img, options_list)
     candidate_results.append([kind + " tess. not optimised", res1])
     # if interactive: print("tesseract not optimised : ",res1)
     # if interactive: cv2.imshow("not optimised", img)
@@ -657,7 +861,55 @@ def collect_candidate_results(img, kind, basename):
     write_gray_to_file(img_name, img)
 
     # extract the figures from this optimised image
-    res2 = get_digits(img_name, img, options_list)
+    res2 = get_OCR_string(img_name, img, options_list)
+    candidate_results.append([kind + " tess. optimised", res2])
+    # if interactive: print("tesseract  optimised : ",res1)
+    # if interactive: cv2.imshow("optimised", img)
+    explain_tesseract(img, kind + " pytess. optimised",
+                      options_str, candidate_results)
+
+    return candidate_results
+
+def collect_candidate_results_status(img, kind, basename):
+    """
+    extract from img all the possible candidates as ph/cl status
+    """
+    # # NB : shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
+    # options_str = "--psm 13 -c tessedit_char_whitelist='.0123456789 '"
+    options_str = ""
+    # #options_str="--psm 6 -c tessedit_char_whitelist='.0123456789 '"
+    
+    # shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
+    options_list = shlex.split(options_str)
+
+    candidate_results = []
+    img_name = basename+'_' + kind + '_cropped'
+    #if interactive: cv2.imshow(img_name, img)
+    # save a copy of this plain image for later analysis
+    write_gray_to_file(img_name, img)
+
+    # # read it again to check
+    # img = cv2.imread(filename)
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # if interactive: cv2.imshow("cropped digits", img); cv2.waitKey
+
+    # extract the figures from this plain image
+    res1 = get_OCR_string(img_name, img, options_list)
+    candidate_results.append([kind + " tess. not optimised", res1])
+    # if interactive: print("tesseract not optimised : ",res1)
+    # if interactive: cv2.imshow("not optimised", img)
+    explain_tesseract(img, kind + " pytess. not optimised",
+                      options_str, candidate_results)
+
+    # try to optimise the image
+    img = optimise_img(img)
+    img_name = basename+'_' + kind + '_optimised'
+    #if interactive: cv2.imshow(img_name, img)
+    # save a copy of this plain image for later analysis
+    write_gray_to_file(img_name, img)
+
+    # extract the figures from this optimised image
+    res2 = get_OCR_string(img_name, img, options_list)
     candidate_results.append([kind + " tess. optimised", res2])
     # if interactive: print("tesseract  optimised : ",res1)
     # if interactive: cv2.imshow("optimised", img)
@@ -722,16 +974,18 @@ def check_pool():
         else:
             filename = "tmp_"+basename+'.jpg'
             filename_bak = "tmp_"+basename+'.bak.jpg'
-            img_ph_cl, img_status_ph = cropped_digits_pool_img(filename)
+            img_ph_cl, img_status_ph, img_status_cl, img_status_p = cropped_digits_pool_img(filename)
             os.rename(filename, filename_bak)
 
         if interactive:
             print("")
 
 
+    #------------------------------------------
+    # OCR of ph and cl
     img = img_ph_cl
     if isinstance(img,np.ndarray) and img.any() != None:
-        candidate_results = collect_candidate_results(img, "power", basename)
+        candidate_results = collect_candidate_results(img, "pool_ph_cl", basename)
         
         pH, Cl = get_best_result(candidate_results, img)
         # pH,Cl = check_digits(res1)
@@ -749,12 +1003,70 @@ def check_pool():
     else:
         pH, Cl = None, None
 
-    return pH, Cl
+    #------------------------------------------
+    # OCR of status_ph
+    img = img_status_ph
+    if isinstance(img,np.ndarray) and img.any() != None:
+        candidate_results_status_ph = collect_candidate_results_status(img, "status_ph", basename)
+        
+        status_ph = get_best_result_status(candidate_results_status_ph, img)
+        # pH,Cl = check_digits(res1)
+
+        if status_ph != None:
+            create_event("pool_status_ph", status_ph)
+
+        if interactive:
+            # cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+    #------------------------------------------
+    # OCR of status_cl
+    img = img_status_cl
+    if isinstance(img,np.ndarray) and img.any() != None:
+        candidate_results_status_cl = collect_candidate_results_status(img, "status_cl", basename)
+        
+        status_cl = get_best_result_status(candidate_results_status_cl, img)
+        # cl,Cl = check_digits(res1)
+
+        if status_cl != None:
+            create_event("pool_status_cl", status_cl)
+
+        if interactive:
+            # cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+    else:
+        status_cl = None
+
+    #------------------------------------------
+    # OCR of status_p
+    img = img_status_p
+    if isinstance(img,np.ndarray) and img.any() != None:
+        candidate_results_status_p = collect_candidate_results_status(img, "status_p", basename)
+        
+        status_p = get_best_result_status(candidate_results_status_p, img)
+        # cl,Cl = check_digits(res1)
+
+        if status_p != None:
+            create_event("pool_status_p", status_p)
+
+        if interactive:
+            # cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+    else:
+        status_p = None
+
+
+
+    return pH, Cl, status_ph, status_cl, status_p
 
 
 def calibration_pool():
     global calib_x, calib_y, calib_width, calib_height
     global calib_status_ph_x, calib_status_ph_y, calib_status_ph_width, calib_status_ph_height
+    global calib_status_cl_x, calib_status_cl_y, calib_status_cl_width, calib_status_cl_height
+    global calib_status_p_x, calib_status_p_y, calib_status_p_width, calib_status_p_height
     basename = "pool_base"
 
     footage_filename = get_cam_footage(basename, webcam)
@@ -765,6 +1077,7 @@ def calibration_pool():
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     if isinstance(img,np.ndarray):
+        
         title = "ph-cl"        
         calib_x, calib_y, calib_width, calib_height = set_calibration(
             title, img, calib_x, calib_y, calib_width, calib_height)
@@ -784,6 +1097,26 @@ def calibration_pool():
         utils.replace_param("params.py", "calib_status_ph_height", calib_status_ph_height)
         logging.info(
             f'x:{calib_status_ph_x}, y:{calib_status_ph_y}, width:{calib_status_ph_width}, height:{calib_status_ph_height}')
+
+        title = "status_cl"        
+        calib_status_cl_x, calib_status_cl_y, calib_status_cl_width, calib_status_cl_height = set_calibration(
+            title, img, calib_status_cl_x, calib_status_cl_y, calib_status_cl_width, calib_status_cl_height)
+        utils.replace_param("params.py", "calib_status_cl_x", calib_status_cl_x)
+        utils.replace_param("params.py", "calib_status_cl_y", calib_status_cl_y)
+        utils.replace_param("params.py", "calib_status_cl_width", calib_status_cl_width)
+        utils.replace_param("params.py", "calib_status_cl_height", calib_status_cl_height)
+        logging.info(
+            f'x:{calib_status_cl_x}, y:{calib_status_cl_y}, width:{calib_status_cl_width}, height:{calib_status_cl_height}')
+
+        title = "status_p"        
+        calib_status_p_x, calib_status_p_y, calib_status_p_width, calib_status_p_height = set_calibration(
+            title, img, calib_status_p_x, calib_status_p_y, calib_status_p_width, calib_status_p_height)
+        utils.replace_param("params.py", "calib_status_p_x", calib_status_p_x)
+        utils.replace_param("params.py", "calib_status_p_y", calib_status_p_y)
+        utils.replace_param("params.py", "calib_status_p_width", calib_status_p_width)
+        utils.replace_param("params.py", "calib_status_p_height", calib_status_p_height)
+        logging.info(
+            f'x:{calib_status_p_x}, y:{calib_status_p_y}, width:{calib_status_p_width}, height:{calib_status_p_height}')
 
 
     else:
@@ -814,7 +1147,7 @@ def main():
         else:
             print_usage()
 
-    pH, Cl = check_pool()
+    pH, Cl, status_ph, status_cl, status_p = check_pool()
     if pH != None or Cl != None:
         logging.info(f'pH : {pH} - Cl : {Cl}')
     else:
