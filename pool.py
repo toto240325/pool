@@ -55,12 +55,16 @@ calib_status_cl_y = params.calib_status_cl_y
 calib_status_cl_width = params.calib_status_cl_width
 calib_status_cl_height = params.calib_status_cl_height
 
-calib_status_p_x = params.calib_status_p_x
-calib_status_p_y = params.calib_status_p_y
-calib_status_p_width = params.calib_status_p_width
-calib_status_p_height = params.calib_status_p_height
+calib_status_pp_x = params.calib_status_pp_x
+calib_status_pp_y = params.calib_status_pp_y
+calib_status_pp_width = params.calib_status_pp_width
+calib_status_pp_height = params.calib_status_pp_height
 
-best_threshold = params.best_threshold
+calib_pool_delai_x = params.calib_pool_delai_x
+calib_pool_delai_y = params.calib_pool_delai_y
+calib_pool_delai_width = params.calib_pool_delai_width
+calib_pool_delai_height = params.calib_pool_delai_height
+
 
 # export DISPLAY=localhost:xx.0
 
@@ -294,8 +298,10 @@ def get_best_thresholded_img(img, basename, kind, best, step):
         cropped_img = np.copy(img[calib_status_ph_y : calib_status_ph_y + calib_status_ph_height, calib_status_ph_x : calib_status_ph_x + calib_status_ph_width])
     elif kind == "status_cl":
         cropped_img = np.copy(img[calib_status_cl_y : calib_status_cl_y + calib_status_cl_height, calib_status_cl_x : calib_status_cl_x + calib_status_cl_width])
-    elif kind == "status_p":
-        cropped_img = np.copy(img[calib_status_p_y : calib_status_p_y + calib_status_p_height, calib_status_p_x : calib_status_p_x + calib_status_p_width])
+    elif kind == "status_pp":
+        cropped_img = np.copy(img[calib_status_pp_y : calib_status_pp_y + calib_status_pp_height, calib_status_pp_x : calib_status_pp_x + calib_status_pp_width])
+    elif kind == "pool_delai":
+        cropped_img = np.copy(img[calib_pool_delai_y : calib_pool_delai_y + calib_pool_delai_height, calib_pool_delai_x : calib_pool_delai_x + calib_pool_delai_width])
     else:
         logging.error(f'unexpected kind : {kind} !!')
         
@@ -309,9 +315,10 @@ def get_best_thresholded_img(img, basename, kind, best, step):
     # if kind == "ph_cl":     mmsb = [90, 111, 10, 60]    # best_threshold at 12:00
     # if kind == "status_ph": mmsb = [90, 111, 10, 100]
     # if kind == "status_cl": mmsb = [90, 111, 10, 100]
-    # if kind == "status_p":  mmsb = [90, 111, 10, 100]
+    # if kind == "status_pp":  mmsb = [90, 111, 10, 100]
     
-    if False:
+    debug_threshold = False
+    if debug_threshold:
         test_best_threshold(cropped_img, start, end, step)
     
     best_threshold = best
@@ -324,7 +331,7 @@ def get_best_thresholded_img(img, basename, kind, best, step):
 
 
 def cropped_digits_pool_img(filename):
-    global interactive, best_threshold
+    global interactive
 
     basename_ext = os.path.basename(filename)
     basename, ext = os.path.splitext(basename_ext)
@@ -410,16 +417,17 @@ def cropped_digits_pool_img(filename):
 
     # # print("cv2.THRESH_BINARY : ", cv2.THRESH_BINARY)
 
-    img_ph_cl = get_best_thresholded_img    (img, basename, "ph_cl",     60, 10)
+    img_ph_cl = get_best_thresholded_img    (img, basename, "ph_cl",     100, 10)
     img_status_ph = get_best_thresholded_img(img, basename, "status_ph", 80, 10)
     img_status_cl = get_best_thresholded_img(img, basename, "status_cl", 80, 10)
-    img_status_p = get_best_thresholded_img (img, basename, "status_p",  90, 10)
+    img_status_pp = get_best_thresholded_img (img, basename, "status_pp",  90, 10)
+    img_pool_delai = get_best_thresholded_img (img, basename, "pool_delai",  130, 10)
     
     # -----------------------------------
 
     # Display cropped image
     #if interactive: cv2.imshow("threshed", img)
-    return img_ph_cl, img_status_ph, img_status_cl, img_status_p
+    return img_ph_cl, img_status_ph, img_status_cl, img_status_pp, img_pool_delai
 
 
 def get_OCR_string(img_name, img, options_list):
@@ -975,7 +983,7 @@ def check_pool():
         else:
             filename = "tmp_"+basename+'.jpg'
             filename_bak = "tmp_"+basename+'.bak.jpg'
-            img_ph_cl, img_status_ph, img_status_cl, img_status_p = cropped_digits_pool_img(filename)
+            img_ph_cl, img_status_ph, img_status_cl, img_status_pp , img_pool_delai = cropped_digits_pool_img(filename)
             os.rename(filename, filename_bak)
 
         if interactive:
@@ -1040,34 +1048,54 @@ def check_pool():
         status_cl = None
 
     #------------------------------------------
-    # OCR of status_p
-    img = img_status_p
+    # OCR of status_pp
+    img = img_status_pp
     if isinstance(img,np.ndarray) and img.any() != None:
-        candidate_results_status_p = collect_candidate_results_status(img, "status_p", basename)
+        candidate_results_status_p = collect_candidate_results_status(img, "status_pp", basename)
         
-        status_p = get_best_result_status(candidate_results_status_p, img)
+        status_pp = get_best_result_status(candidate_results_status_p, img)
         # cl,Cl = check_digits(res1)
 
-        if status_p != None:
-            create_event("pool_status_p", status_p)
+        if status_pp != None:
+            create_event("pool_status_pp", status_pp)
 
         if interactive:
             # cv2.waitKey(0)
             cv2.destroyAllWindows()
 
     else:
-        status_p = None
+        status_pp = None
+
+    #------------------------------------------
+    # OCR of pool_delai
+    img = img_pool_delai
+    if isinstance(img,np.ndarray) and img.any() != None:
+        candidate_results_pool_delai = collect_candidate_results_status(img, "pool_delai", basename)
+        
+        pool_delai = get_best_result_status(candidate_results_pool_delai, img)
+        # cl,Cl = check_digits(res1)
+
+        if pool_delai != None:
+            create_event("pool_pool_delai", pool_delai)
+
+        if interactive:
+            # cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+    else:
+        pool_delai = None
 
 
 
-    return pH, Cl, status_ph, status_cl, status_p
+    return pH, Cl, status_ph, status_cl, status_pp, pool_delai
 
 
 def calibration_pool():
     global calib_x, calib_y, calib_width, calib_height
     global calib_status_ph_x, calib_status_ph_y, calib_status_ph_width, calib_status_ph_height
     global calib_status_cl_x, calib_status_cl_y, calib_status_cl_width, calib_status_cl_height
-    global calib_status_p_x, calib_status_p_y, calib_status_p_width, calib_status_p_height
+    global calib_status_pp_x, calib_status_pp_y, calib_status_pp_width, calib_status_pp_height
+    global calib_pool_delai_x, calib_pool_delai_y, calib_pool_delai_width, calib_pool_delai_height
     basename = "pool_base"
 
     footage_filename = get_cam_footage(basename, webcam)
@@ -1109,15 +1137,25 @@ def calibration_pool():
         logging.info(
             f'x:{calib_status_cl_x}, y:{calib_status_cl_y}, width:{calib_status_cl_width}, height:{calib_status_cl_height}')
 
-        title = "status_p"        
-        calib_status_p_x, calib_status_p_y, calib_status_p_width, calib_status_p_height = set_calibration(
-            title, img, calib_status_p_x, calib_status_p_y, calib_status_p_width, calib_status_p_height)
-        utils.replace_param("params.py", "calib_status_p_x", calib_status_p_x)
-        utils.replace_param("params.py", "calib_status_p_y", calib_status_p_y)
-        utils.replace_param("params.py", "calib_status_p_width", calib_status_p_width)
-        utils.replace_param("params.py", "calib_status_p_height", calib_status_p_height)
+        title = "status_pp"        
+        calib_status_pp_x, calib_status_pp_y, calib_status_pp_width, calib_status_pp_height = set_calibration(
+            title, img, calib_status_pp_x, calib_status_pp_y, calib_status_pp_width, calib_status_pp_height)
+        utils.replace_param("params.py", "calib_status_pp_x", calib_status_pp_x)
+        utils.replace_param("params.py", "calib_status_pp_y", calib_status_pp_y)
+        utils.replace_param("params.py", "calib_status_pp_width", calib_status_pp_width)
+        utils.replace_param("params.py", "calib_status_pp_height", calib_status_pp_height)
         logging.info(
-            f'x:{calib_status_p_x}, y:{calib_status_p_y}, width:{calib_status_p_width}, height:{calib_status_p_height}')
+            f'x:{calib_status_pp_x}, y:{calib_status_pp_y}, width:{calib_status_pp_width}, height:{calib_status_pp_height}')
+
+        title = "pool_delai"        
+        calib_pool_delai_x, calib_pool_delai_y, calib_pool_delai_width, calib_pool_delai_height = set_calibration(
+            title, img, calib_pool_delai_x, calib_pool_delai_y, calib_pool_delai_width, calib_pool_delai_height)
+        utils.replace_param("params.py", "calib_pool_delai_x", calib_pool_delai_x)
+        utils.replace_param("params.py", "calib_pool_delai_y", calib_pool_delai_y)
+        utils.replace_param("params.py", "calib_pool_delai_width", calib_pool_delai_width)
+        utils.replace_param("params.py", "calib_pool_delai_height", calib_pool_delai_height)
+        logging.info(
+            f'x:{calib_pool_delai_x}, y:{calib_pool_delai_y}, width:{calib_pool_delai_width}, height:{calib_pool_delai_height}')
 
 
     else:
@@ -1148,7 +1186,7 @@ def main():
         else:
             print_usage()
 
-    pH, Cl, status_ph, status_cl, status_p = check_pool()
+    pH, Cl, status_ph, status_cl, status_pp, pool_delai = check_pool()
     if pH != None or Cl != None:
         logging.info(f'pH : {pH} - Cl : {Cl}')
     else:
