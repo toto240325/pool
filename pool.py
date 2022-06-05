@@ -71,11 +71,11 @@ calib_pool_delai_y = params.calib_pool_delai_y
 calib_pool_delai_width = params.calib_pool_delai_width
 calib_pool_delai_height = params.calib_pool_delai_height
 
-
-# export DISPLAY=localhost:xx.0
-# print("DISPLAY : ",os.environ["DISPLAY"])
-
 def set_display():
+    """
+    sets the environmnent $DISPLAY variable based on the value established the last time an Xserver 
+    (typically MobaXterm) provided a local display and that value was stored in a local file
+    """
     filename = "/home/toto/.display"
     if os.path.isfile(filename):
         f = open(filename, "r")
@@ -282,7 +282,6 @@ def test_best_threshold(kind, img, start, end, step):
     (this function should be identifical between pool and power)
     """
     # # # # testing the best threshold
-    set_display()
     img_bck = np.copy(img)
     i = 0
     height = 200
@@ -316,7 +315,7 @@ def get_best_thresholded_img(img, basename, kind, best, step):
         
     if kind == "ph":
         cropped_img = np.copy(img[calib_ph_y : calib_ph_y + calib_ph_height, calib_ph_x : calib_ph_x + calib_ph_width])
-    if kind == "cl":
+    elif kind == "cl":
         cropped_img = np.copy(img[calib_cl_y : calib_cl_y + calib_cl_height, calib_cl_x : calib_cl_x + calib_cl_width])
     elif kind == "status_ph":
         cropped_img = np.copy(img[calib_status_ph_y : calib_status_ph_y + calib_status_ph_height, calib_status_ph_x : calib_status_ph_x + calib_status_ph_width])
@@ -417,18 +416,18 @@ def get_OCR_string(img_name, img, options_list):
     return process.stdout.strip()
 
 
-def check_digits(st):
-    """
-    checks if string st contains 3 digits, then a space, then 3 digits, and 
-    return the corresponding int values (ph and cl) if that's the case, or None otherwise
-    """
-    st = st.strip()
-    ph = None
-    cl = None
-    if len(st) == 7 and st[0:3].isnumeric and st[-3:].isnumeric:
-        ph = int(st[0:3])/100.0
-        cl = int(st[-3:])
-    return ph, cl
+# def check_digits(st):
+#     """
+#     checks if string st contains 3 digits, then a space, then 3 digits, and 
+#     return the corresponding int values (ph and cl) if that's the case, or None otherwise
+#     """
+#     st = st.strip()
+#     ph = None
+#     cl = None
+#     if len(st) == 7 and st[0:3].isnumeric and st[-3:].isnumeric:
+#         ph = int(st[0:3])/100.0
+#         cl = int(st[-3:])
+#     return ph, cl
 
 
 def last_validated_value(categ):
@@ -517,7 +516,7 @@ def get_best_result(kind, candidate_results, img):
             if st[0:3].isnumeric(): candidate = int(st[0:3])
             # check the read figures make sense (sometimes a "7" is read as a "1" by tesseract)
             if kind == "ph":
-                candidate = candidate/100
+                candidate = candidate*1.0/100
                 if candidate > 4:
                     valid_results.append(candidate)
             if kind == "cl":
@@ -833,7 +832,60 @@ def optimise_img(img):
     return img
 
 
-def explain_tesseract(img, title, options_str,candidate_results):
+def show_boxes(kind, title, img_orig, options_str, nb_lines):
+    
+    if not kind in params.show_boxes: return
+    
+    
+    img = np.copy(img_orig)
+    print("orig shape : ", img.shape)
+
+    img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    
+    print("converted shape : ", img.shape)
+    
+    boxes = pytesseract.image_to_boxes(img, config=options_str)
+    hImg, wImg, channels = img.shape
+
+
+    r, c, _ = img.shape
+
+    if nb_lines > 0:
+        additional_lines = np.full((nb_lines, c, 3), 255, dtype=np.uint8)
+        # adding a blank rectangle above and below the image
+        img = np.append(img, additional_lines, axis=0)
+        img = np.append(additional_lines, img, axis=0)
+
+
+    for b in boxes.splitlines():
+        # print(b)
+        b = b.split(' ')
+        # print(b)
+        x, y, w, h = int(b[1]), int(b[2]), int(b[3]), int(b[4])
+        
+        cv2.rectangle(img, (x, hImg-y+nb_lines),
+                      (w, hImg-h+nb_lines), (0, 255, 0), 1)
+        cv2.putText(img, b[0], (x, hImg-y+25+nb_lines),
+                    cv2.FONT_HERSHEY_COMPLEX, 1, (255, 0, 0), 1)
+
+
+    window_name = f'{kind}-{title}'
+    flags = cv2.WINDOW_NORMAL & cv2.WINDOW_KEEPRATIO
+    #flags = cv2.WINDOW_AUTOSIZE
+    cv2.namedWindow(window_name, flags)
+    cv2.imshow(window_name, img)
+    cv2.resizeWindow(window_name, 1800, 1000)
+    cv2.moveWindow(window_name, 10,10)
+
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+    #if interactive: cv2.imshow('Image with boxes', img2)
+    # cv2.waitKey(0)
+
+
+def explain_tesseract(img, kind, title, options_str,candidate_results):
     """
     explains the tesseract way of analysing this image by having boxes drawn around the characters
     """
@@ -846,31 +898,13 @@ def explain_tesseract(img, title, options_str,candidate_results):
     img2 = np.append(img, additional_lines, axis=0)
     img2 = np.append(additional_lines, img2, axis=0)
 
-    # if interactive: cv2.imshow("img extended", img2)
-
-    hImg, wImg = img.shape
-    # print("pytesseract options", options_str)
     myres = pytesseract.image_to_string(img, config=options_str).strip()
-    candidate_results.append([f'{title} (orig size)', myres])
-    #if interactive: print("pytesseract (orig): ", myres)
+    candidate_results.append([f'{kind}-{title} (orig size)', myres])
+    show_boxes(kind, f'{title} (orig size)', img, options_str, nb_lines)
+    
     myres2 = pytesseract.image_to_string(img2, config=options_str).strip()
-    candidate_results.append([f'{title} (extended)', myres2])
-    #if interactive: print("pytesseract (extended): ", myres2)
-
-    boxes = pytesseract.image_to_boxes(img, config=options_str)
-
-    for b in boxes.splitlines():
-        # print(b)
-        b = b.split(' ')
-        # print(b)
-        x, y, w, h = int(b[1]), int(b[2]), int(b[3]), int(b[4])
-        cv2.rectangle(img2, (x, hImg-y+nb_lines),
-                      (w, hImg-h+nb_lines), (0, 255, 0), 2)
-        cv2.putText(img2, b[0], (x, hImg-y+25+nb_lines),
-                    cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
-
-    #if interactive: cv2.imshow('Image with boxes', img2)
-    # cv2.waitKey(0)
+    candidate_results.append([f'{kind}-{title} (extended size)', myres2])
+    show_boxes(kind, f'{title} (extended size)', img2, options_str, 0)
 
 
 def write_gray_to_file(img_name, img):
@@ -914,7 +948,7 @@ def collect_candidate_results(img, kind, basename):
     candidate_results.append([kind + " tess. not optimised", res1])
     # if interactive: print("tesseract not optimised : ",res1)
     # if interactive: cv2.imshow("not optimised", img)
-    explain_tesseract(img, kind + " pytess. not optimised",
+    explain_tesseract(img, kind, "pytess. not optimised",
                       options_str, candidate_results)
 
     # try to optimise the image
@@ -929,7 +963,7 @@ def collect_candidate_results(img, kind, basename):
     candidate_results.append([kind + " tess. optimised", res2])
     # if interactive: print("tesseract  optimised : ",res1)
     # if interactive: cv2.imshow("optimised", img)
-    explain_tesseract(img, kind + " pytess. optimised",
+    explain_tesseract(img, kind, "pytess. optimised",
                       options_str, candidate_results)
 
     return candidate_results
@@ -962,7 +996,7 @@ def collect_candidate_results_status(img, kind, basename):
     candidate_results.append([kind + " tess. not optimised", res1])
     # if interactive: print("tesseract not optimised : ",res1)
     # if interactive: cv2.imshow("not optimised", img)
-    explain_tesseract(img, kind + " pytess. not optimised",
+    explain_tesseract(img, kind, "pytess. not optimised",
                       options_str, candidate_results)
 
     # try to optimise the image
@@ -977,7 +1011,7 @@ def collect_candidate_results_status(img, kind, basename):
     candidate_results.append([kind + " tess. optimised", res2])
     # if interactive: print("tesseract  optimised : ",res1)
     # if interactive: cv2.imshow("optimised", img)
-    explain_tesseract(img, kind + " pytess. optimised",
+    explain_tesseract(img, kind, "pytess. optimised",
                       options_str, candidate_results)
 
     return candidate_results
@@ -1170,8 +1204,6 @@ def calibration_pool():
     global calib_pool_delai_x, calib_pool_delai_y, calib_pool_delai_width, calib_pool_delai_height
     basename = "pool_base"
 
-    set_display()
-
     footage_filename = get_cam_footage(basename, webcam)
     img_filename = get_snapshot(footage_filename)
     img = None
@@ -1258,6 +1290,9 @@ def main():
     utils.init_logger('INFO')
     logging.info("-----------------------------------------------------")
     logging.info("Starting pool")
+
+    # set display based on last value, just in case there is a needed calibration, threshold adjustment or tesseract box checking
+    set_display()
 
     do_calibration = False
     nb_args = len(sys.argv)
