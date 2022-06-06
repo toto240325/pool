@@ -79,12 +79,12 @@ def set_display():
     filename = "/home/toto/.display"
     if os.path.isfile(filename):
         f = open(filename, "r")
-        display = f.readline()
+        display = f.readline().strip()
         print(f'display read in {filename} : {display}')
         f.close()
     else:
         display = 10
-    os.environ["DISPLAY"] = display.strip()
+    os.environ["DISPLAY"] = display
 
 
 def get_cam_footage(basename, webcam):
@@ -541,7 +541,7 @@ def get_best_result(kind, candidate_results, img):
     else:
         # at least one valid result; first one is kept, unless we find another one which is closer to the last_validated_val
         if kind == "ph":
-            last_validated_ph = last_validated_value("pool_ph")
+            last_validated = last_validated_value("pool_ph")
         elif kind == "cl":
             last_validated = last_validated_value("pool_cl")
 
