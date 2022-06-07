@@ -83,7 +83,7 @@ def set_display():
         print(f'display read in {filename} : {display}')
         f.close()
     else:
-        display = 10
+        display = "10"
     os.environ["DISPLAY"] = display
 
 
