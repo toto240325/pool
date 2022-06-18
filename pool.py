@@ -517,7 +517,7 @@ def get_best_result(kind, candidate_results, img):
             # check the read figures make sense (sometimes a "7" is read as a "1" by tesseract)
             if kind == "ph":
                 candidate = candidate*1.0/100
-                if candidate > 4:
+                if candidate > 2:
                     valid_results.append(candidate)
             if kind == "cl":
                 if candidate > 400:
