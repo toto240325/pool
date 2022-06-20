@@ -40,6 +40,9 @@ import utils
 import params
 
 webcam = params.webcam
+jpg_path = "jpg/"
+issues_path = "issues/"
+
 
 calib_ph_x = params.calib_ph_x
 calib_ph_y = params.calib_ph_y
@@ -118,58 +121,6 @@ def get_cam_footage(basename, webcam):
     return footage_filename
 
 
-def get_snapshot_old(footage_filename):
-    """
-    extract a snapshot from <basename>.h264 and put it in <basename>.jpg
-    (this function should be identifical between pool and power)
-    """
-
-    if footage_filename == None:
-        return None
-    try_again = True
-    i = 0
-    max_iteration = 3
-    basename_ext = os.path.basename(footage_filename)
-    basename, ext = os.path.splitext(basename_ext)
-    while try_again and i <= max_iteration:
-        # extra a picture from that video
-        process = subprocess.run(
-            ['ffmpeg', '-y', '-i', f'{basename}.h264',
-                '-frames:v', '1', f'{basename}.jpg'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True)
-        my_stdout = process.stdout
-        err = process.stderr
-        # print("----args = ", process.args)
-        # print("----rc = ", process.returncode)
-        # print("----stdout = ", my_stdout)
-        # print("----err = ", err)
-
-        # try_again = (
-        #     (err.find("Output file is empty") != -1)
-        #     or
-        #     (err.find("Conversion failed!") != -1)
-        # )
-        # continue until a jpg is produced (which doesn't happen if the .h264 file is corrupted or empty)
-        try_again = (not os.path.isfile(f'{basename}.jpg'))
-
-        if try_again: time.sleep(1)
-        i += 1
-
-    logging.info(f"nb_iteration : {i}")
-    if i > max_iteration:
-        logging.error("!!!!!!!! couldn't extract snapshot from footage !!!!!")
-    else:
-        os.rename(f'{basename}.h264', f'{basename}.bak.h264')
-
-    if i <= max_iteration:
-        extracted_img_filename = f'{basename}.jpg'
-    else:
-        extracted_img_filename = None
-
-    return extracted_img_filename
-
 def get_snapshot(footage_filename):
     """
     extract a snapshot from <basename>.h264 and put it in <basename>.jpg
@@ -183,7 +134,7 @@ def get_snapshot(footage_filename):
     # extract a picture from that video
     process = subprocess.run(
         ['ffmpeg', '-y', '-i', f'{basename}.h264',
-            '-frames:v', '1', f'{basename}.jpg'],
+            '-frames:v', '1', f'{jpg_path}{basename}.jpg'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True)
@@ -194,9 +145,9 @@ def get_snapshot(footage_filename):
     # print("----stdout = ", my_stdout)
     # print("----err = ", err)
 
-    if os.path.isfile(f'{basename}.jpg'):
+    if os.path.isfile(f'{jpg_path}{basename}.jpg'):
         os.rename(f'{basename}.h264', f'{basename}.bak.h264')
-        extracted_img_filename = f'{basename}.jpg'
+        extracted_img_filename = f'{jpg_path}{basename}.jpg'
     else:
         extracted_img_filename = None
 
@@ -396,7 +347,7 @@ def get_OCR_string(img_name, img, options_list):
     """
     # reads digits from picture
     # if interactive: cv2.imshow("cropped digits", img)
-    temp_filename = img_name + ".jpg"
+    temp_filename = jpg_path + img_name + ".jpg"
     temp_output_filename = "tmp_output.txt"
     cv2.imwrite(temp_filename, img)
 
@@ -520,16 +471,12 @@ def get_best_result(kind, candidate_results, img):
                 if candidate > 2:
                     valid_results.append(candidate)
             if kind == "cl":
-                if candidate > 400:
+                if candidate > 300:
                     valid_results.append(candidate)
 
 
     # remove duplicates from list of valid results
     valid_results = list(dict.fromkeys(valid_results))
-
-    issues_path = "issues/"
-    if not os.path.isdir(issues_path):
-        os.mkdir(issues_path)
 
     if len(valid_results) == 0:
         # no valid results; store image for later analysis
@@ -623,10 +570,6 @@ def get_best_result_ph_cl_old(candidate_results, img):
 
     # remove duplicates from list of valid results for cl
     valid_results_cl = list(dict.fromkeys(valid_results_cl))
-
-    issues_path = "issues/"
-    if not os.path.isdir(issues_path):
-        os.mkdir(issues_path)
 
     if len(valid_results_ph) == 0:
         # no valid results; store image for later analysis
@@ -912,14 +855,14 @@ def write_gray_to_file(img_name, img):
     takes a gray image and write it to disk
     """
     img_to_save = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    cv2.imwrite(img_name + ".jpg", img_to_save)
+    cv2.imwrite(jpg_path + img_name + ".jpg", img_to_save)
 
 def write_colour_to_file(img_name, img):
     """
     takes a colour image and write it to disk
     """
     img_to_save = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(img_name + ".jpg", img_to_save)
+    cv2.imwrite(jpg_path + img_name + ".jpg", img_to_save)
 
 def collect_candidate_results(img, kind, basename):
     """
@@ -1035,6 +978,7 @@ def check_pool():
 
     basename = "pool_base"
 
+
     # if debug:
     #     filename = "threshed_chalet1.jpg"
     #     img = cv2.imread(filename)
@@ -1066,12 +1010,12 @@ def check_pool():
     if successful:
         debug = False
         if debug:
-            filename = "threshed_chalet1.jpg"
+            filename = jpg_path + "threshed_chalet1.jpg"
             img = cv2.imread(filename)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         else:
-            filename = "tmp_"+basename+'.jpg'
-            filename_bak = "tmp_"+basename+'.bak.jpg'
+            filename = jpg_path + "tmp_"+basename+'.jpg'
+            filename_bak = jpg_path + "tmp_"+basename+'.bak.jpg'
             img_ph, img_cl, img_status_ph, img_status_cl, img_status_pp , img_pool_delai = cropped_digits_pool_img(filename)
             os.rename(filename, filename_bak)
 
@@ -1286,6 +1230,17 @@ def print_usage():
     print(" python pool.py anythingelse : print this usage")
 
 
+def check_necessary_dirs():
+    """
+    create the necessary folders if not yet exist
+    """
+    if not os.path.isdir(issues_path):
+        os.mkdir(issues_path)
+
+    if not os.path.isdir(jpg_path):
+        os.mkdir(jpg_path)
+
+
 def main():
     utils.init_logger('INFO')
     logging.info("-----------------------------------------------------")
@@ -1294,6 +1249,8 @@ def main():
     # set display based on last value, just in case there is a needed calibration, threshold adjustment or tesseract box checking
     set_display()
 
+    check_necessary_dirs()
+    
     do_calibration = False
     nb_args = len(sys.argv)
     logging.info(f'Number of arguments: {nb_args} arguments.')
