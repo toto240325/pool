@@ -40,7 +40,7 @@ import utils
 import params
 
 webcam = params.webcam
-jpg_path = "jpg/"
+pict_path = "pict/"
 issues_path = "issues/"
 
 
@@ -123,7 +123,7 @@ def get_cam_footage(basename, webcam):
 
 def get_snapshot(footage_filename):
     """
-    extract a snapshot from <basename>.h264 and put it in <basename>.jpg
+    extract a snapshot from <basename>.h264 and put it in <basename>.png
     (this function should be identifical between pool and power)
     """
 
@@ -134,7 +134,7 @@ def get_snapshot(footage_filename):
     # extract a picture from that video
     process = subprocess.run(
         ['ffmpeg', '-y', '-i', f'{basename}.h264',
-            '-frames:v', '1', f'{jpg_path}{basename}.jpg'],
+            '-frames:v', '1', f'{pict_path}{basename}.png'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True)
@@ -145,9 +145,9 @@ def get_snapshot(footage_filename):
     # print("----stdout = ", my_stdout)
     # print("----err = ", err)
 
-    if os.path.isfile(f'{jpg_path}{basename}.jpg'):
+    if os.path.isfile(f'{pict_path}{basename}.png'):
         os.rename(f'{basename}.h264', f'{basename}.bak.h264')
-        extracted_img_filename = f'{jpg_path}{basename}.jpg'
+        extracted_img_filename = f'{pict_path}{basename}.png'
     else:
         extracted_img_filename = None
 
@@ -311,7 +311,7 @@ def cropped_digits_pool_img(filename):
     # logging.info(img.shape) # Print image shape
     # if interactive: cv2.imshow("original", img)
 
-    # filename2 = "2tmp_pool_base.bak.jpg"
+    # filename2 = "2tmp_pool_base.bak.png"
     # img = cv2.imread(filename2)
     # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -347,7 +347,7 @@ def get_OCR_string(img_name, img, options_list):
     """
     # reads digits from picture
     # if interactive: cv2.imshow("cropped digits", img)
-    temp_filename = jpg_path + img_name + ".jpg"
+    temp_filename = pict_path + img_name + ".png"
     temp_output_filename = "tmp_output.txt"
     cv2.imwrite(temp_filename, img)
 
@@ -483,7 +483,7 @@ def get_best_result(kind, candidate_results, img):
         best_candidate = None
         print(f'No valid results for {kind} !')
         # store image for later analysis :
-        filename = issues_path + now_str + "_" + kind + "_noresult.jpg"
+        filename = issues_path + now_str + "_" + kind + "_noresult.png"
         cv2.imwrite(filename, img)
     else:
         # at least one valid result; first one is kept, unless we find another one which is closer to the last_validated_val
@@ -511,7 +511,7 @@ def get_best_result(kind, candidate_results, img):
                     all_candidates = all_candidates + "_" + str(candidate)
             logging.info(f'more than 1 valid result for {kind} : {all_candidates}')
             # store image for later analysis :
-            filename = issues_path + now_str + "_" + kind + "_ambiguous_" + all_candidates + ".jpg"
+            filename = issues_path + now_str + "_" + kind + "_ambiguous_" + all_candidates + ".png"
             cv2.imwrite(filename, img)
 
     logging.info("")
@@ -576,7 +576,7 @@ def get_best_result_ph_cl_old(candidate_results, img):
         best_candidate_ph = None
         print("No valid results for ph !")
         # store image for later analysis :
-        filename = issues_path + "noresult_ph_" + now_str + ".jpg"
+        filename = issues_path + "noresult_ph_" + now_str + ".png"
         cv2.imwrite(filename, img)
     else:
         # at least one valid result; first one is kept, unless we find another one which is closer to the last_validated_val
@@ -601,7 +601,7 @@ def get_best_result_ph_cl_old(candidate_results, img):
                     all_candidates_ph = all_candidates_ph + "_" + str(candidate)
             logging.info(f'more than 1 valid result for cl : {all_candidates_ph}')
             # store image for later analysis :
-            filename = issues_path + now_str + "_ambiguous_ph_" + all_candidates_ph + ".jpg"
+            filename = issues_path + now_str + "_ambiguous_ph_" + all_candidates_ph + ".png"
             cv2.imwrite(filename, img)
 
     if len(valid_results_cl) == 0:
@@ -609,7 +609,7 @@ def get_best_result_ph_cl_old(candidate_results, img):
         best_candidate_cl = None
         print("No valid results for cl !")
         # store image for later analysis :
-        filename = issues_path + now_str + "_noresult_cl.jpg"
+        filename = issues_path + now_str + "_noresult_cl.png"
         cv2.imwrite(filename, img)
     else:
         # at least one valid result for cl; first one is kept and returned
@@ -623,7 +623,7 @@ def get_best_result_ph_cl_old(candidate_results, img):
                     all_candidates_cl = all_candidates_cl + "_" + str(candidate)
             print("more than 1 valid result for best_candidate_cl : ", all_candidates_cl)
             # store image for later analysis :
-            filename = issues_path + now_str + "_ambiguous_cl_" + all_candidates_cl + ".jpg"
+            filename = issues_path + now_str + "_ambiguous_cl_" + all_candidates_cl + ".png"
             cv2.imwrite(filename, img)
 
     logging.info("")
@@ -690,7 +690,7 @@ def get_best_result_status(candidate_results, img):
     #     best_candidate_ph = None
     #     print("No valid results for ph !")
     #     # store image for later analysis :
-    #     filename = issues_path + "noresult_ph_" + now_str + ".jpg"
+    #     filename = issues_path + "noresult_ph_" + now_str + ".png"
     #     cv2.imwrite(filename, img)
     # else:
     #     # at least one valid result; first one is kept, unless we find another one which is closer to the last_validated_val
@@ -715,7 +715,7 @@ def get_best_result_status(candidate_results, img):
     #                 all_candidates_ph = all_candidates_ph + "_" + str(candidate)
     #         logging.info(f'more than 1 valid result for cl : {all_candidates_ph}')
     #         # store image for later analysis :
-    #         filename = issues_path + "ambiguous_ph_" + all_candidates_ph + "_" + now_str + ".jpg"
+    #         filename = issues_path + "ambiguous_ph_" + all_candidates_ph + "_" + now_str + ".png"
     #         cv2.imwrite(filename, img)
 
     # if len(valid_results_cl) == 0:
@@ -723,7 +723,7 @@ def get_best_result_status(candidate_results, img):
     #     best_candidate_cl = None
     #     print("No valid results for cl !")
     #     # store image for later analysis :
-    #     filename = issues_path + "noresult_cl_" + now_str + ".jpg"
+    #     filename = issues_path + "noresult_cl_" + now_str + ".png"
     #     cv2.imwrite(filename, img)
     # else:
     #     # at least one valid result for cl; first one is kept and returned
@@ -737,7 +737,7 @@ def get_best_result_status(candidate_results, img):
     #                 all_candidates_cl = all_candidates_cl + "_" + str(candidate)
     #         print("more than 1 valid result for best_candidate_cl : ", all_candidates_cl)
     #         # store image for later analysis :
-    #         filename = issues_path + "ambiguous_cl_" + all_candidates_cl + "_" + now_str + ".jpg"
+    #         filename = issues_path + "ambiguous_cl_" + all_candidates_cl + "_" + now_str + ".png"
     #         cv2.imwrite(filename, img)
 
     logging.info("")
@@ -766,7 +766,7 @@ def optimise_img(img):
     #     ],np.uint8)
 
     img = cv2.erode(img, kernel, iterations=2)
-    # cv2.imwrite("base_eroded.jpg", img)
+    # cv2.imwrite("base_eroded.png", img)
     # if interactive: cv2.imshow("eroded", img)
 
     # invert the image again, since done at the beginning
@@ -855,24 +855,24 @@ def write_gray_to_file(img_name, img):
     takes a gray image and write it to disk
     """
     img_to_save = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    cv2.imwrite(jpg_path + img_name + ".jpg", img_to_save)
+    cv2.imwrite(pict_path + img_name + ".png", img_to_save)
 
 def write_colour_to_file(img_name, img):
     """
     takes a colour image and write it to disk
     """
     img_to_save = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(jpg_path + img_name + ".jpg", img_to_save)
+    cv2.imwrite(pict_path + img_name + ".png", img_to_save)
 
 def collect_candidate_results(img, kind, basename):
     """
     extract from img, of given kind ("day", "night", etc) all the possible candidates as 
     read string of numerical digits
     """
-    # NB : shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
+    # NB : shlex.split('tesseract -c page_separator="" cropped_chalet.png stdout --psm 13')
     options_str = "--psm 13 -c tessedit_char_whitelist='.0123456789 '"
     #options_str="--psm 6 -c tessedit_char_whitelist='.0123456789 '"
-    # shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
+    # shlex.split('tesseract -c page_separator="" cropped_chalet.png stdout --psm 13')
     options_list = shlex.split(options_str)
 
     candidate_results = []
@@ -915,12 +915,12 @@ def collect_candidate_results_status(img, kind, basename):
     """
     extract from img all the possible candidates as ph/cl status
     """
-    # # NB : shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
+    # # NB : shlex.split('tesseract -c page_separator="" cropped_chalet.png stdout --psm 13')
     # options_str = "--psm 13 -c tessedit_char_whitelist='.0123456789 '"
     options_str = ""
     # #options_str="--psm 6 -c tessedit_char_whitelist='.0123456789 '"
     
-    # shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
+    # shlex.split('tesseract -c page_separator="" cropped_chalet.png stdout --psm 13')
     options_list = shlex.split(options_str)
 
     candidate_results = []
@@ -970,17 +970,17 @@ def check_pool():
     global candidate_results
     global interactive
 
-    # NB : shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
+    # NB : shlex.split('tesseract -c page_separator="" cropped_chalet.png stdout --psm 13')
     options_str = "--psm 13 -c tessedit_char_whitelist='.0123456789 '"
     #options_str="--psm 6 -c tessedit_char_whitelist='.0123456789 '"
-    # shlex.split('tesseract -c page_separator="" cropped_chalet.jpg stdout --psm 13')
+    # shlex.split('tesseract -c page_separator="" cropped_chalet.png stdout --psm 13')
     options_list = shlex.split(options_str)
 
     basename = "pool_base"
 
 
     # if debug:
-    #     filename = "threshed_chalet1.jpg"
+    #     filename = "threshed_chalet1.png"
     #     img = cv2.imread(filename)
     #     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     # else:
@@ -988,7 +988,7 @@ def check_pool():
     #     img_filename = get_snapshot(footage_filename)
     #     if img_filename != None and os.path.isfile(img_filename):
     #         img = cropped_digits_pool_img(img_filename)
-    #         img_filename_bak = "tmp_"+basename+'.bak.jpg'
+    #         img_filename_bak = "tmp_"+basename+'.bak.png'
     #         os.rename(img_filename, img_filename_bak)
     #     else:
     #         img = None
@@ -1010,12 +1010,12 @@ def check_pool():
     if successful:
         debug = False
         if debug:
-            filename = jpg_path + "threshed_chalet1.jpg"
+            filename = pict_path + "threshed_chalet1.png"
             img = cv2.imread(filename)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         else:
-            filename = jpg_path + "tmp_"+basename+'.jpg'
-            filename_bak = jpg_path + "tmp_"+basename+'.bak.jpg'
+            filename = pict_path + "tmp_"+basename+'.png'
+            filename_bak = pict_path + "tmp_"+basename+'.bak.png'
             img_ph, img_cl, img_status_ph, img_status_cl, img_status_pp , img_pool_delai = cropped_digits_pool_img(filename)
             os.rename(filename, filename_bak)
 
@@ -1237,8 +1237,8 @@ def check_necessary_dirs():
     if not os.path.isdir(issues_path):
         os.mkdir(issues_path)
 
-    if not os.path.isdir(jpg_path):
-        os.mkdir(jpg_path)
+    if not os.path.isdir(pict_path):
+        os.mkdir(pict_path)
 
 
 def main():
